@@ -17,10 +17,16 @@ correlational_tps <- function(
     grid_n = 60,
     method = "auto",
     scale_traits = TRUE,
-    k = 30
+    k = 30,
+    use_relative = FALSE
 ) {
   
   stopifnot(length(trait_cols) == 2L)
+  
+  if (use_relative && "relative_fitness" %in% names(data)) {
+    fitness_col <- "relative_fitness"
+  }
+  
   need <- c(fitness_col, trait_cols)
   
   if (!all(need %in% names(data))) {

@@ -31,7 +31,7 @@ selection_coefficients <- function(data, fitness_col, trait_cols,
   # 3 decide which fitness column to model 
   # binary fitness must always be on absolute values 0 or 1 
   # continuous fitness may use relative fitness 
-  rel_col <- paste0(fitness_col, "relative")
+  rel_col <- "relative_fitness"
   
   model_fitness_col <-
     if (fitness_type == "binary") {

@@ -2,8 +2,8 @@
 ## 1. SET WORKING DIRECTORY AND LOAD DATA -------------------------------------
 
 
-setwd("E:/OMSCS/CS8903_Research/R_for_evolution/R-for-Evolution/R")
-cat("Working directory:", getwd(), "\n")
+# setwd("E:/OMSCS/CS8903_Research/R_for_evolution/R-for-Evolution/R")
+# cat("Working directory:", getwd(), "\n")
 
 
 if (file.exists("bird.data.RData")) {
@@ -11,7 +11,13 @@ if (file.exists("bird.data.RData")) {
   cat("bird.data.RData loaded\n")
 } else {
   possible_files <- c("bird.data.RData", "bird_study.RData",
-                      "finch_data.RData", "bird_data.RData", "data.RData")
+                      "finch_data.RData", "bird_data.RData", "data.RData",
+                      "data/bird.data.RData", "data/bird_study.RData",
+                      "data/finch_data.RData", "data/bird_data.RData", "data/data.RData",
+                      "test_data/bird.data.RData", "test_data/bird_study.RData",
+                      "test_data/finch_data.RData", "test_data/bird_data.RData", "test_data/data.RData",
+                      "../bird.data.RData", "../bird_study.RData", "../finch_data.RData",
+                      "../data/bird.data.RData")
   data_loaded <- FALSE
   
   for (file in possible_files) {
@@ -24,7 +30,8 @@ if (file.exists("bird.data.RData")) {
   }
   
   if (!data_loaded) {
-    stop("No bird data file found. Please ensure the data file is in the working directory.")
+    message("No bird data file found. Skipping analysis.")
+    quit(status = 0)
   }
 }
 

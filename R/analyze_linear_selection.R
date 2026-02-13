@@ -18,6 +18,7 @@ analyze_linear_selection <- function(data, fitness_col, trait_cols, fitness_type
   
   if (fitness_type == "continuous") {
     resp <- if ("relative_fitness" %in% names(data)) {
+      "relative_fitness"
     } else {
       fitness_col
     }

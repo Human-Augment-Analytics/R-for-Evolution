@@ -361,10 +361,10 @@ validate_plot <- function(plot, plot_name) {
   )
   
   if (all(checks)) {
-    cat(lot_name, "PASS\n")
+    cat(plot_name, "PASS\n")
     return(TRUE)
   } else {
-    cat(lot_name, "FAIL - Issues:", paste(names(checks)[!checks], collapse = ", "), "\n")
+    cat(plot_name, "FAIL - Issues:", paste(names(checks)[!checks], collapse = ", "), "\n")
     return(FALSE)
   }
 }
@@ -394,6 +394,9 @@ cat("Correlation plots:", length(correlation_plots), "\n")
 
 
 cat("\n11. Updated final summary...\n")
+
+total <- length(results)
+passed <- sum(grepl("PASS", unlist(results)))
 
 cat("Functions tested:", length(function_files), "\n")
 cat("Tests passed:", passed, "/", total, "\n")

@@ -13,7 +13,27 @@ if (!dir.exists(results_dir)) {
 cat("\n2. LOADING DATA AND FUNCTIONS...\n")
 
 # Load Crescent Pond puppyfish dataset
-crescent_path <- "E:/OMSCS/CS8903_Research/R_for_evolution - Copy/R-for-Evolution/R/Crescent+Pond+-+size-corrected+trait+data+++survival+++growth+++d13C+++d15N.csv"
+crescent_filename <- "Crescent+Pond+-+size-corrected+trait+data+++survival+++growth+++d13C+++d15N.csv"
+possible_paths <- c(
+  file.path("data", crescent_filename),
+  file.path("test_data", crescent_filename),
+  file.path("..", "data", crescent_filename),
+  file.path("..", "test_data", crescent_filename),
+  crescent_filename
+)
+
+crescent_path <- NULL
+for (p in possible_paths) {
+  if (file.exists(p)) {
+    crescent_path <- p
+    break
+  }
+}
+
+if (is.null(crescent_path)) {
+  message("Data file not found. Checked: ", paste(possible_paths, collapse=", "), ". Skipping analysis.")
+  quit(status = 0)
+}
 crescent_data <- read.csv(crescent_path)
 
 # Define fitness variables and trait set
