@@ -209,7 +209,7 @@ if (length(yearly_results) > 0) {
 
 cat("\n7. Saving results\n")
 
-output_dir <- "plant_selection_results"
+output_dir <- here("R","results","plant_selection_results")
 if (!dir.exists(output_dir)) dir.create(output_dir)
 
 analysis_results <- list(
