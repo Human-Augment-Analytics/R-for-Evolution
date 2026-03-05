@@ -7,7 +7,7 @@ cat("Current working directory:", getwd(), "\n")
 
 required_packages <- c(
   "dplyr", "tidyr", "ggplot2", "mgcv", "fields",
-  "purrr", "patchwork", "viridis", "scales", "knitr"
+  "purrr", "patchwork", "viridis", "scales", "knitr", "here"
 )
 
 for (pkg in required_packages) {
@@ -106,6 +106,8 @@ analysis_data_clean <- analysis_data %>%
     !is.na(FDsnow),
     !is.na(height)
   )
+
+names(analysis_data_clean) <- make.names(names(analysis_data_clean))
 
 trait_cols <- c("SLA", "deltaC13", "FDsnow", "height")
 
@@ -211,7 +213,7 @@ if (length(yearly_results) > 0) {
 
 cat("\n7. Saving results\n")
 
-output_dir <- "plant_selection_results"
+output_dir <- here("R","results","plant_selection_results")
 if (!dir.exists(output_dir)) dir.create(output_dir)
 
 # 1. Save the main multivariate results to CSV
