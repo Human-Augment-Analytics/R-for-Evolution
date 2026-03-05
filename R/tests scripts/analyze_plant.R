@@ -12,36 +12,38 @@ required_packages <- c(
 
 for (pkg in required_packages) {
   if (!requireNamespace(pkg, quietly = TRUE)) {
-    install.packages(pkg)
+    install.packages(pkg, repos = "https://cloud.r-project.org")
   }
   library(pkg, character.only = TRUE)
   cat("Loaded package:", pkg, "\n")
 }
 
 cat("\n2. Loading selection analysis functions\n")
+source_dir <- ".." # Relative path to the directory containing the source files
 
 function_files <- c(
-  "prepare_selection_data.R",
+  "prepare_selection_data.R", 
   "analyze_linear_selection.R",
-  "analyze_nonlinear_selection.R",
+  "analyze_nonlinear_selection.R", 
   "extract_results.R",
-  "selection_coefficients.R",
-  "detect_family.R",
+  "selection_coefficients.R", 
+  "detect_family.R", 
   "selection_differential.R",
-  "univariate_spline.R",
-  "univariate_surface.R",
+  "analyze_disruptive_selection.R",
+  "univariate_spline.R", 
+  "univariate_surface.R", 
   "correlational_tps.R",
-  "correlation_surface.R",
+  "correlation_surface.R", 
   "bootstrap_selection.R"
 )
 
 for (f in function_files) {
-  function_path <- here("R",f)
-  if (file.exists(function_path)){
-    source(function_path)
-    cat("Sourced", f, "\n")
+  file_path <- file.path(source_dir, f)
+  if (file.exists(file_path)) {
+    source(file_path)
+    cat("Sourced:", f, "\n")
   } else {
-    cat("File not found:", f, "\n")
+    cat("File not found:", file_path, "\n")
   }
 }
 
@@ -50,12 +52,13 @@ for (f in function_files) {
 # =============================================================================
 
 cat("\n3. Data loading and exploration\n")
+data_dir <- "../test_data" # Relative path to the directory containing the data files
 
 data_files <- list(
-  data1 = here("R","test_data","Aster_analyses_2011_Cohort.txt"),
-  data2 = here("R","test_data","Aster_analyses_2012_Cohort_full.txt"),
-  data3 = here("R","test_data","Aster_analyses_2011_Cohort_full.txt"),
-  data4 = here("R","test_data","Aster_analyses_2012_Cohort.txt")
+  data1 = file.path(data_dir, "Aster_analyses_2011_Cohort.txt"),
+  data2 = file.path(data_dir, "Aster_analyses_2012_Cohort_full.txt"),
+  data3 = file.path(data_dir, "Aster_analyses_2011_Cohort_full.txt"),
+  data4 = file.path(data_dir, "Aster_analyses_2012_Cohort.txt")
 )
 
 data1 <- read.delim(data_files$data1, sep = "\t")
@@ -89,6 +92,7 @@ fitness_wide <- fitness_2011 %>%
   pivot_wider(
     names_from = c(season, varb),
     names_sep = "_",
+    names_prefix = "Year",
     values_from = resp
   )
 
@@ -114,7 +118,7 @@ fecund_cols <- grep("_fecund", names(analysis_data_clean), value = TRUE)
 surv_cols <- grep("_surv|survived", names(analysis_data_clean), value = TRUE)
 flower_cols <- grep("_flr", names(analysis_data_clean), value = TRUE)
 
-main_fecund_col <- grep("^X2013_.*fecund",
+main_fecund_col <- grep("^Year2013_.*fecund",
   names(analysis_data_clean),
   value = TRUE
 )[1]
@@ -161,12 +165,12 @@ print(multi_trait_result)
 cat("\n6. Temporal analysis\n")
 
 yearly_results <- list()
-fecund_cols <- grep("^201[2-4]_.*fecund",
+fecund_cols <- grep("^Year201[2-4]_.*fecund",
   names(analysis_data_clean),
   value = TRUE
 )
 
-years_to_analyze <- as.integer(sub("_.*", "", fecund_cols))
+years_to_analyze <- as.integer(sub("Year", "", sub("_.*", "", fecund_cols)))
 
 for (i in seq_along(fecund_cols)) {
   year <- years_to_analyze[i]
@@ -177,10 +181,10 @@ for (i in seq_along(fecund_cols)) {
 
   if (nrow(year_data) < 10) next
 
-  res <- selection_coefficients(
+  res <- analyze_disruptive_selection(
     data = year_data,
     fitness_col = fitness_col,
-    trait_cols = "FDsnow",
+    trait_col = "FDsnow",
     fitness_type = "continuous",
     standardize = TRUE
   )
@@ -212,6 +216,29 @@ cat("\n7. Saving results\n")
 output_dir <- here("R","results","plant_selection_results")
 if (!dir.exists(output_dir)) dir.create(output_dir)
 
+# 1. Save the main multivariate results to CSV
+write.csv(multi_trait_result, 
+          file = file.path(output_dir, "multivariate_selection_results.csv"), 
+          row.names = FALSE)
+
+# 2. Save the temporal analysis to CSV if it exists
+if (exists("yearly_summary")) {
+  write.csv(yearly_summary, 
+            file = file.path(output_dir, "temporal_selection_results.csv"), 
+            row.names = FALSE)
+}
+
+# 3. Create a simple text summary report
+summary_conn <- file(file.path(output_dir, "summary_report.txt"))
+writeLines(c(
+  paste("Analysis Date:", Sys.time()),
+  paste("Families analyzed:", nrow(main_data_prepared)),
+  paste("Traits analyzed:", paste(trait_cols, collapse = ", ")),
+  paste("Significant gradients:", sum(multi_trait_result$P_Value < 0.05, na.rm = TRUE))
+), summary_conn)
+close(summary_conn)
+
+# 4. Save the R-specific objects for future loading
 analysis_results <- list(
   date = Sys.time(),
   sample_size = nrow(main_data_prepared),
@@ -222,13 +249,16 @@ analysis_results <- list(
 )
 
 saveRDS(
-  analysis_results,
+  analysis_results, 
   file.path(output_dir, "analysis_results.rds")
 )
-
 save.image(file.path(output_dir, "workspace.RData"))
 
 cat("Results saved to directory:", output_dir, "\n")
+cat("  - multivariate_selection_results.csv\n")
+if (exists("yearly_summary")) cat("  - temporal_selection_results.csv\n")
+cat("  - summary_report.txt\n")
+cat("  - analysis_results.rds (for R)\n")
 
 # =============================================================================
 # PART 7: FINAL SUMMARY
