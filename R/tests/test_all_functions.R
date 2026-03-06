@@ -7,7 +7,9 @@ cat("\n========================================\n")
 cat("RUNNING FULL FUNCTION TEST SUITE\n")
 cat("========================================\n")
 
-setwd("/Users/vanessa/OMSCS/CS6999/R-for-Evolution")
+if (dir.exists("../../R/scripts")) {
+    setwd("../..")
+}
 cat("Working directory:", getwd(), "\n")
 
 # ------------------------------------------------------
@@ -219,6 +221,12 @@ cat("Univariate surfaces Done\n")
 
 cat("\nTesting correlated fitness surfaces...\n")
 
+if (!exists("trait_pairs")) {
+    trait_pairs <- list(c("size", "speed"), c("size", "color"), c("speed", "color"))
+}
+
+cfs_plots <- list()
+
 for (pair in trait_pairs) {
     cfs <- correlated_fitness_surface(
         data = df_continuous,
@@ -233,6 +241,7 @@ for (pair in trait_pairs) {
     )
 
     name <- paste(pair, collapse = "_")
+    cfs_plots[[name]] <- plot
 
     ggsave(
         file.path(figure_dir, paste0("cfs_", name, ".png")),
