@@ -19,17 +19,12 @@ for (pkg in required_packages) {
 }
 
 cat("\n2. Loading selection analysis functions\n")
-source_dir <- ".." # Relative path to the directory containing the source files
 
 function_files <- c(
-  "prepare_selection_data.R", 
-  "analyze_linear_selection.R",
-  "analyze_nonlinear_selection.R", 
   "extract_results.R",
   "selection_coefficients.R", 
   "detect_family.R", 
   "selection_differential.R",
-  "analyze_disruptive_selection.R",
   "univariate_spline.R", 
   "univariate_surface.R", 
   "correlational_tps.R",
@@ -37,11 +32,28 @@ function_files <- c(
   "bootstrap_selection.R"
 )
 
+scripts_files <- c(
+  "1_prepare_selection_data.R",
+  "2_linear_selection_analysis.R",
+  "3_nonlinear_selection_analysis.R",
+  "4_disruptive_selection_analysis.R"
+)
+
 for (f in function_files) {
-  file_path <- file.path(source_dir, f)
+  file_path <- here("R","functions", f)
   if (file.exists(file_path)) {
     source(file_path)
     cat("Sourced:", f, "\n")
+  } else {
+    cat("File not found:", file_path, "\n")
+  }
+}
+
+for (s in scripts_files) {
+  file_path <- here("R","scripts", s)
+  if (file.exists(file_path)) {
+    source(file_path)
+    cat("Sourced:", s, "\n")
   } else {
     cat("File not found:", file_path, "\n")
   }
@@ -52,13 +64,12 @@ for (f in function_files) {
 # =============================================================================
 
 cat("\n3. Data loading and exploration\n")
-data_dir <- "../test_data" # Relative path to the directory containing the data files
 
 data_files <- list(
-  data1 = file.path(data_dir, "Aster_analyses_2011_Cohort.txt"),
-  data2 = file.path(data_dir, "Aster_analyses_2012_Cohort_full.txt"),
-  data3 = file.path(data_dir, "Aster_analyses_2011_Cohort_full.txt"),
-  data4 = file.path(data_dir, "Aster_analyses_2012_Cohort.txt")
+  data1 = here("R","data", "Aster_analyses_2011_Cohort.txt"),
+  data2 = here("R","data", "Aster_analyses_2012_Cohort_full.txt"),
+  data3 = here("R","data", "Aster_analyses_2011_Cohort_full.txt"),
+  data4 = here("R","data", "Aster_analyses_2012_Cohort.txt")
 )
 
 data1 <- read.delim(data_files$data1, sep = "\t")
