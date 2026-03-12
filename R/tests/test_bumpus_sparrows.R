@@ -7,7 +7,9 @@ cat("\n========================================\n")
 cat("BUMPUS SPARROW FUNCTION TEST\n")
 cat("========================================\n")
 
-setwd("/Users/vanessa/OMSCS/CS6999/R-for-Evolution")
+if (dir.exists("../../R/scripts")) {
+  setwd("../..")
+}
 cat("Working directory:", getwd(), "\n")
 
 # ------------------------------------------------------
