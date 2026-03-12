@@ -55,6 +55,20 @@ for (f in fn_files) {
   cat("Loaded:", basename(f), "\n")
 }
 
+# Explicitly load scripts from R/scripts
+scripts_to_load <- c(
+  "R/scripts/1_prepare_selection_data.R",
+  "R/scripts/2_linear_selection_analysis.R",
+  "R/scripts/3_nonlinear_selection_analysis.R"
+)
+
+for (script in scripts_to_load) {
+  if (file.exists(script)) {
+    source(script)
+    cat("Loaded:", basename(script), "\n")
+  }
+}
+
 plot_files <- list.files(
   "R/plotting",
   pattern = "\\.R$",
