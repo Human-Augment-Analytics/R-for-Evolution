@@ -5,6 +5,12 @@
 cat("1. Working directory and package initialization\n")
 cat("Current working directory:", getwd(), "\n")
 
+# Initialize environment
+if (file.exists("R/scripts/0.0_initialize.R")) {
+  source("R/scripts/0.0_initialize.R")
+  cat("   Sourced: 0.0_initialize.R\n")
+}
+
 required_packages <- c(
   "dplyr", "tidyr", "ggplot2", "mgcv", "fields",
   "purrr", "patchwork", "viridis", "scales", "knitr", "here"
@@ -24,43 +30,42 @@ for (pkg in required_packages) {
 
 cat("\n2. LOADING FUNCTIONS...\n")
 
-function_files <- c(
-  "extract_results.R",
-  "detect_family.R",
-  "selection_coefficients.R",
-  "selection_differential.R",
-  "univariate_spline.R", 
-  "univariate_surface.R",
-  "correlational_tps.R", 
-  "correlation_surface.R"
+cat("\nLoading function files and plotting files...\n")
+
+fn_files <- list.files(
+  here("R", "functions"),
+  pattern = "\\.R$",
+  full.names = TRUE
 )
 
-script_files <- c(
-  "1_prepare_selection_data.R",
-  "2_linear_selection_analysis.R",
-  "3_nonlinear_selection_analysis.R"
-)
-
-for (f in function_files) {
-  # Functions located in R/functions
-  file_path <- here("R", "functions", f)
-  if (file.exists(file_path)) {
-    source(file_path)
-    cat("   Sourced:", f, "\n")
-  } else {
-    cat("   File not found:", file_path, "\n")
-  }
+for (f in fn_files) {
+  source(f)
+  cat("   Loaded:", basename(f), "\n")
 }
 
-for (s in script_files) {
-  # Functions located in R/scripts
-  file_path <- here("R", "scripts", s)
-  if (file.exists(file_path)) {
-    source(file_path)
-    cat("   Sourced:", s, "\n")
-  } else {
-    cat("   File not found:", file_path, "\n")
-  }
+plot_files <- list.files(
+  here("R", "plotting"),
+  pattern = "\\.R$",
+  full.names = TRUE
+)
+
+for (f in plot_files) {
+  source(f)
+  cat("   Loaded plot:", basename(f), "\n")
+}
+
+script_files <- list.files(
+  here("R", "scripts"),
+  pattern = "\\.R$",
+  full.names = TRUE
+)
+
+# Exclude initialization script
+script_files <- script_files[!grepl("0.0_initialize\\.R$", script_files)]
+
+for (f in script_files) {
+  source(f)
+  cat("   Loaded script:", basename(f), "\n")
 }
 
 # =============================================================================
@@ -311,14 +316,14 @@ if (exists("univariate_spline") && !is.null(prepared_binary)) {
     if (!is.null(spline_result)) {
       univariate_results[[trait]] <- spline_result
       
-      if (exists("univariate_surface")) {
+      if (exists("plot_univariate_fitness")) {
         plot_file <- file.path(
           results_dir,
           paste0("univariate_surface_", trait, ".png")
         )
         png(plot_file, width = 800, height = 600)
         print(
-          univariate_surface(spline_result, trait_col = trait) +
+          plot_univariate_fitness(spline_result, trait_col = trait) +
             labs(title = paste("Fitness Surface:", trait))
         )
         dev.off()
@@ -336,11 +341,11 @@ if (exists("univariate_spline") && !is.null(prepared_binary)) {
 }
 
 # Bivariate (correlational) fitness surface
-if (exists("correlational_tps") && !is.null(prepared_binary)) {
+if (exists("correlated_fitness_surface") && !is.null(prepared_binary)) {
   trait_pair <- morphological_traits[1:2]
   
   tps_result <- tryCatch({
-    result <- correlational_tps(
+    result <- correlated_fitness_surface(
       data = prepared_binary,
       fitness_col = fitness_binary,
       trait_cols = trait_pair,
@@ -348,11 +353,11 @@ if (exists("correlational_tps") && !is.null(prepared_binary)) {
       grid_n = 20
     )
     
-    if (exists("correlation_surface")) {
+    if (exists("plot_correlated_fitness")) {
       plot_file <- file.path(results_dir, "correlation_surface.png")
       png(plot_file, width = 1000, height = 800)
       print(
-        correlation_surface(result, trait_cols = trait_pair) +
+        plot_correlated_fitness(result, trait_cols = trait_pair) +
           labs(title = "Bivariate Fitness Surface")
       )
       dev.off()
