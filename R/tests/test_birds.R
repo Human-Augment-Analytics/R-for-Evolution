@@ -2,14 +2,24 @@
 
 cat("Current working directory:", getwd(), "\n")
 
-# Go up one level from /test scripts and into /test_data
-data_path <- "../test_data/bird_data.csv"
+# Load 'here' for path management
+if (!requireNamespace("here", quietly = TRUE)) install.packages("here")
+library(here)
+
+data_path <- here("R", "data", "bird_data.csv")
 
 if (file.exists(data_path)) {
   bird_study <- read.csv(data_path, stringsAsFactors = FALSE)
-  cat("bird_data.csv loaded\n")
+  cat("bird_data.csv loaded from", data_path, "\n")
 } else {
-  stop("bird_data.csv not found.")
+  # Try fallback location if R/test_data doesn't exist
+  data_path_fallback <- here("test_data", "bird_data.csv")
+  if (file.exists(data_path_fallback)) {
+    bird_study <- read.csv(data_path_fallback, stringsAsFactors = FALSE)
+    cat("bird_data.csv loaded from", data_path_fallback, "\n")
+  } else {
+    stop("bird_data.csv not found at ", data_path, " or ", data_path_fallback)
+  }
 }
 
 # Remove duplicate X.y.* columns
@@ -50,7 +60,7 @@ if (all(beak_cols %in% names(bird_study))) {
 
 ## 2. LOAD REQUIRED PACKAGES ---------------------------------------------------
 
-required_packages <- c("ggplot2", "dplyr", "tidyr", "mgcv", "fields", "purrr")
+required_packages <- c("ggplot2", "dplyr", "tidyr", "mgcv", "fields", "purrr", "here")
 for (pkg in required_packages) {
   if (!requireNamespace(pkg, quietly = TRUE)) {
     install.packages(pkg)
@@ -61,22 +71,51 @@ for (pkg in required_packages) {
 
 ## 3. LOAD ALL FUNCTIONS -------------------------------------------------------
 
-function_files <- c(
-  "prepare_selection_data.R", "analyze_linear_selection.R", "analyze_nonlinear_selection.R",
-  "extract_results.R", "selection_coefficients.R", "detect_family.R", "selection_differential.R", 
-  "univariate_spline.R", "univariate_surface.R", "correlational_tps.R", "correlation_surface.R", 
-  "bootstrap_selection.R"
+# ------------------------------------------------------
+# 1 Initialize environment
+# ------------------------------------------------------
+if (file.exists(here("R", "scripts", "0.0_initialize.R"))) {
+  source(here("R", "scripts", "0.0_initialize.R"))
+}
+
+# ------------------------------------------------------
+# 3 Load function files and plotting files
+# ------------------------------------------------------
+cat("\nLoading function files and plotting files...\n")
+
+fn_files <- list.files(
+  here("R", "functions"),
+  pattern = "\\.R$",
+  full.names = TRUE
 )
 
-for (file in function_files) {
-  file_path <- paste0("../", file)
+for (f in fn_files) {
+  source(f)
+  cat("Loaded:", basename(f), "\n")
+}
 
-  if (file.exists(file_path)) {
-    source(file_path)
-    cat("pass", file, "\n")
-  } else {
-    cat("failed", file, "NOT FOUND\n")
-  }
+script_files <- list.files(
+  here("R", "scripts"),
+  pattern = "\\.R$",
+  full.names = TRUE
+)
+# Exclude 0.0_initialize.R since it is sourced above
+script_files <- script_files[basename(script_files) != "0.0_initialize.R"]
+
+for (f in script_files) {
+  source(f)
+  cat("Loaded script:", basename(f), "\n")
+}
+
+plot_files <- list.files(
+  here("R", "plotting"),
+  pattern = "\\.R$",
+  full.names = TRUE
+)
+
+for (f in plot_files) {
+  source(f)
+  cat("Loaded plot:", basename(f), "\n")
 }
 
 ## 4. DATA PREPARATION FUNCTION -----------------------------------------------
@@ -248,7 +287,7 @@ if (all(c(beak_trait, "PC.body1") %in% names(main_data))) {
 
 ## 6.3 VISUALIZATION FUNCTIONS -------------------------------------------------
 
-cat("Testing univariate_spline and univariate_surface...\n")
+cat("Testing univariate_spline and plot_univariate_fitness...\n")
 traits_for_vis <- intersect(c(beak_trait, "PC.body1"), names(main_data_prepared))
 
 for (trait in traits_for_vis) {
@@ -262,17 +301,11 @@ for (trait in traits_for_vis) {
       k = 8
     )
     
-    surface_plot <- univariate_surface(
+    surface_plot <- plot_univariate_fitness(
       uni = spline_result,
-      trait_col = trait
-    ) +
-      labs(
-        title = paste("Fitness Surface -", trait),
-        subtitle = paste("Year:", best_year),
-        x = paste(trait, "(standardized)"),
-        y = "Relative Fitness"
-      ) +
-      theme_minimal()
+      trait_col = trait,
+      title = paste("Fitness Surface -", trait, "- Year:", best_year)
+    )
     
     print(surface_plot)
     cat(" ✓\n")
@@ -283,9 +316,9 @@ for (trait in traits_for_vis) {
 
 
 if (length(traits_for_model) >= 2) {
-  cat("Testing correlational_tps and correlation_surface...\n")
+  cat("Testing correlated_fitness_surface and plot_correlated_fitness...\n")
   tryCatch({
-    tps_result <- correlational_tps(
+    tps_result <- correlated_fitness_surface(
       data = main_data_prepared,
       fitness_col = "fitness",
       trait_cols = traits_for_model[1:2],
@@ -293,7 +326,7 @@ if (length(traits_for_model) >= 2) {
       method = "auto"
     )
     
-    corr_plot <- correlation_surface(
+    corr_plot <- plot_correlated_fitness(
       tps = tps_result,
       trait_cols = traits_for_model[1:2]
     ) +
@@ -319,7 +352,7 @@ if (length(traits_for_model) >= 2) {
   for (method in methods_to_test) {
     cat("Method:", method, "...")
     tryCatch({
-      method_tps <- correlational_tps(
+      method_tps <- correlated_fitness_surface(
         data = main_data_prepared,
         fitness_col = "fitness",
         trait_cols = traits_for_model[1:2],
@@ -327,7 +360,7 @@ if (length(traits_for_model) >= 2) {
         method = method
       )
       
-      method_plot <- correlation_surface(
+      method_plot <- plot_correlated_fitness(
         tps = method_tps,
         trait_cols = traits_for_model[1:2]
       ) +
