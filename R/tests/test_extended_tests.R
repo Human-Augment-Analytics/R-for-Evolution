@@ -7,37 +7,33 @@ cat("\n========================================\n")
 cat("RUNNING FULL FUNCTION TEST SUITE\n")
 cat("========================================\n")
 
+required_packages <- c(
+  "here"
+)
+
+for (pkg in required_packages) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    install.packages(pkg, repos = "https://cloud.r-project.org")
+  }
+  library(pkg, character.only = TRUE)
+  cat("Loaded package:", pkg, "\n")
+}
+
 set.seed(123)
 
-if (dir.exists("../../R/scripts")) {
-  setwd("../..")
-}
-cat("Working directory:", getwd(), "\n")
+cat("Project Root:", here(), "\n")
 
 # ------------------------------------------------------
 # 1 Initialize environment
 # ------------------------------------------------------
 
-if (file.exists("R/scripts/0.0_initialize.R")) {
-  source("R/scripts/0.0_initialize.R")
+if (file.exists(here("R","scripts","/0.0_initialize.R"))) {
+  source(here("R","scripts","/0.0_initialize.R"))
 }
 
 # ======================================================
 # 2 Output directories
 # ======================================================
-
-output_dir <- file.path("R", "results", "extended_tests")
-figure_dir <- file.path(output_dir, "figures")
-table_dir <- file.path(output_dir, "tables")
-model_dir <- file.path(output_dir, "models")
-
-dirs <- c(output_dir, figure_dir, table_dir, model_dir)
-
-for (d in dirs) {
-  if (!dir.exists(d)) dir.create(d, recursive = TRUE)
-}
-
-cat("Results saved to:", normalizePath(output_dir), "\n")
 
 # ======================================================
 # Load scripts
@@ -46,7 +42,7 @@ cat("Results saved to:", normalizePath(output_dir), "\n")
 cat("\nLoading script files...\n")
 
 script_files <- list.files(
-  "R/scripts",
+  here("R","scripts"),
   pattern = "\\.R$",
   full.names = TRUE
 )
@@ -63,7 +59,7 @@ for (f in script_files) {
 cat("\nLoading function files...\n")
 
 fn_files <- list.files(
-  "R/functions",
+  here("R","functions"),
   pattern = "\\.R$",
   full.names = TRUE
 )
@@ -80,7 +76,7 @@ for (f in fn_files) {
 cat("\nLoading plotting functions...\n")
 
 plot_files <- list.files(
-  "R/plotting",
+  here("R","plotting"),
   pattern = "\\.R$",
   full.names = TRUE
 )
@@ -89,6 +85,23 @@ for (f in plot_files) {
   source(f)
   cat("Loaded plot:", basename(f), "\n")
 }
+
+# ======================================================
+# Define Output Directories
+# ======================================================
+
+output_dir <- here("R", "results", "extended_tests")
+figure_dir <- file.path(output_dir, "figures")
+table_dir <- file.path(output_dir, "tables")
+model_dir <- file.path(output_dir, "models")
+
+dirs <- c(output_dir, figure_dir, table_dir, model_dir)
+
+for (d in dirs) {
+  if (!dir.exists(d)) dir.create(d, recursive = TRUE)
+}
+
+cat("Results saved to:", normalizePath(output_dir), "\n")
 
 # ======================================================
 # 5 Create synthetic test data
