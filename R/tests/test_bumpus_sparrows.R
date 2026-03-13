@@ -55,17 +55,18 @@ for (f in fn_files) {
   cat("Loaded:", basename(f), "\n")
 }
 
-# Explicitly load scripts from R/scripts
-scripts_to_load <- c(
-  "R/scripts/1_prepare_selection_data.R",
-  "R/scripts/2_linear_selection_analysis.R",
-  "R/scripts/3_nonlinear_selection_analysis.R"
+# Load scripts from R/scripts
+script_files <- list.files(
+  "R/scripts",
+  pattern = "\\.R$",
+  full.names = TRUE
 )
 
-for (script in scripts_to_load) {
-  if (file.exists(script)) {
-    source(script)
-    cat("Loaded:", basename(script), "\n")
+for (f in script_files) {
+  # Skip initialize script as it was run at start
+  if (basename(f) != "0.0_initialize.R") {
+    source(f)
+    cat("Loaded script:", basename(f), "\n")
   }
 }
 
