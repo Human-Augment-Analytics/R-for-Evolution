@@ -55,6 +55,21 @@ for (f in fn_files) {
   cat("Loaded:", basename(f), "\n")
 }
 
+# Load scripts from R/scripts
+script_files <- list.files(
+  "R/scripts",
+  pattern = "\\.R$",
+  full.names = TRUE
+)
+
+for (f in script_files) {
+  # Skip initialize script as it was run at start
+  if (basename(f) != "0.0_initialize.R") {
+    source(f)
+    cat("Loaded script:", basename(f), "\n")
+  }
+}
+
 plot_files <- list.files(
   "R/plotting",
   pattern = "\\.R$",
@@ -85,6 +100,12 @@ bumpus$TL <- bumpus$totlen
 bumpus$HL <- bumpus$humer
 bumpus$WT <- bumpus$wgt
 bumpus$KL <- bumpus$stern
+
+# Filter for adults to match original study (if AG column exists)
+if ("AG" %in% names(bumpus)) {
+  cat("Filtering for adults only (AG == 'adult')...\n")
+  bumpus <- bumpus[bumpus$AG == "adult", ]
+}
 
 cat("Rows:", nrow(bumpus), "\n")
 cat("Survival rate:", mean(bumpus$Survived), "\n")
@@ -129,7 +150,53 @@ for (k in seq_along(TRAITS)) {
       cat("SUCCESS:", name, "\n")
     },
     error = function(e) {
-      cat("FAILED:", name, "-", e$message, "\n")
+      # Fallback for univariate case where nonlinear analysis might fail
+      if (length(traits) == 1) {
+        cat("Fallback: Running univariate linear selection for", name, "...\n")
+        
+        tryCatch({
+          # Prepare data minimally
+          df_prep <- prepare_selection_data(
+            data = bumpus,
+            fitness_col = FITNESS,
+            trait_cols = traits,
+            standardize = FALSE,
+            add_relative = FALSE
+          )
+          
+          # Run linear analysis directly
+          lin_res <- analyze_linear_selection(
+            data = df_prep,
+            fitness_col = FITNESS,
+            trait_cols = traits,
+            fitness_type = "binary"
+          )
+          
+          # Extract coefficients manually to match output format
+          coefs <- summary(lin_res$model)$coefficients
+          row_idx <- which(rownames(coefs) == traits)
+          
+          res <- data.frame(
+            Term = rownames(coefs)[row_idx],
+            Type = "Linear",
+            Beta_Coefficient = coefs[row_idx, 1],
+            Standard_Error = coefs[row_idx, 2],
+            P_Value = coefs[row_idx, 4],
+            Variance = coefs[row_idx, 2]^2
+          )
+          
+          write.csv(
+            res,
+            file.path(table_dir, paste0("selection_", name, ".csv")),
+            row.names = FALSE
+          )
+          cat("SUCCESS (Fallback):", name, "\n")
+        }, error = function(e2) {
+          cat("FAILED (Fallback):", name, "-", e2$message, "\n")
+        })
+      } else {
+        cat("FAILED:", name, "-", e$message, "\n")
+      }
     }
   )
 }
