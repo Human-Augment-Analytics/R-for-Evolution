@@ -7,7 +7,7 @@ cat("Current working directory:", getwd(), "\n")
 
 # Initialize environment
 if (file.exists("R/scripts/0.0_initialize.R")) {
-  source("R/scripts/0.0_initialize.R")
+  source("R/0.0_initialize.R")
   cat("   Sourced: 0.0_initialize.R\n")
 }
 
@@ -33,7 +33,7 @@ cat("\n2. LOADING FUNCTIONS...\n")
 cat("\nLoading function files and plotting files...\n")
 
 fn_files <- list.files(
-  here("R", "functions"),
+  here("R"),
   pattern = "\\.R$",
   full.names = TRUE
 )
@@ -44,7 +44,7 @@ for (f in fn_files) {
 }
 
 plot_files <- list.files(
-  here("R", "plotting"),
+  here("R"),
   pattern = "\\.R$",
   full.names = TRUE
 )
@@ -55,7 +55,7 @@ for (f in plot_files) {
 }
 
 script_files <- list.files(
-  here("R", "scripts"),
+  here("R"),
   pattern = "\\.R$",
   full.names = TRUE
 )
@@ -75,7 +75,7 @@ for (f in script_files) {
 cat("\n3. DATA LOADING AND PREPARATION...\n")
 
 # Define data directories to search
-data_dirs <- c(here("R", "data"), here("R", "test_data"))
+data_dirs <- c(here("inst", "extdata"))
 
 # Helper function to find files in directories
 find_data_file <- function(filenames, dirs) {
@@ -154,8 +154,8 @@ morphological_traits <- c("jaw", "eye", "body", "nasal", "mouth", "SL")
 
 # Assemble analysis dataset
 test_data <- crescent_data %>%
-  select(all_of(c(fitness_binary, fitness_continuous, morphological_traits))) %>%
-  filter(complete.cases(.))
+  dplyr::select(dplyr::all_of(c(fitness_binary, fitness_continuous, morphological_traits))) %>%
+  dplyr::filter(complete.cases(.))
 
 cat("   Test dataset contains", nrow(test_data), "complete observations\n")
 
