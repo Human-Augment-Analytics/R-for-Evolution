@@ -19,21 +19,23 @@ for (pkg in required_packages) {
 }
 
 cat("\n2. Loading selection analysis functions\n")
-source_dir <- ".." # Relative path to the directory containing the source files
+source_dir <- here::here("R") # Safely point to the R/ directory
 
 function_files <- c(
-  "prepare_selection_data.R", 
-  "analyze_linear_selection.R",
-  "analyze_nonlinear_selection.R", 
+  "0.0_initialize.R",
+  "1_prepare_selection_data.R", 
+  "2_linear_selection_analysis.R",
+  "3_nonlinear_selection_analysis.R", 
   "extract_results.R",
   "selection_coefficients.R", 
   "detect_family.R", 
   "selection_differential.R",
-  "analyze_disruptive_selection.R",
+  "4_disruptive_selection_analysis.R",
+  "5_adaptive_landscape_analysis.R",
   "univariate_spline.R", 
-  "univariate_surface.R", 
-  "correlational_tps.R",
-  "correlation_surface.R", 
+  "plot_univariate_fitness.R", 
+  "correlated_fitness_surface.R",
+  "plot_correlated_fitness.R", 
   "bootstrap_selection.R"
 )
 
@@ -52,7 +54,7 @@ for (f in function_files) {
 # =============================================================================
 
 cat("\n3. Data loading and exploration\n")
-data_dir <- "../test_data" # Relative path to the directory containing the data files
+data_dir <- here::here("inst", "extdata") # Safely point to the data directory
 
 data_files <- list(
   data1 = file.path(data_dir, "Aster_analyses_2011_Cohort.txt"),
@@ -80,16 +82,16 @@ cat("\n4. Data preparation\n")
 c13_col <- grep("c13|deltaC13", names(data3), ignore.case = TRUE, value = TRUE)[1]
 
 traits_2011 <- data3 %>%
-  select(geno, elevation, season, SLA, !!c13_col, FDsnow, height) %>%
-  rename(deltaC13 = !!c13_col) %>%
-  distinct(geno, season, .keep_all = TRUE)
+  dplyr::select(geno, elevation, season, SLA, !!c13_col, FDsnow, height) %>%
+  dplyr::rename(deltaC13 = !!c13_col) %>%
+  dplyr::distinct(geno, season, .keep_all = TRUE)
 
 fitness_2011 <- data1 %>%
-  select(geno, season, varb, resp) %>%
-  filter(!is.na(resp))
+  dplyr::select(geno, season, varb, resp) %>%
+  dplyr::filter(!is.na(resp))
 
 fitness_wide <- fitness_2011 %>%
-  pivot_wider(
+  tidyr::pivot_wider(
     names_from = c(season, varb),
     names_sep = "_",
     names_prefix = "Year",
@@ -97,10 +99,10 @@ fitness_wide <- fitness_2011 %>%
   )
 
 analysis_data <- traits_2011 %>%
-  left_join(fitness_wide, by = "geno")
+  dplyr::left_join(fitness_wide, by = "geno")
 
 analysis_data_clean <- analysis_data %>%
-  filter(
+  dplyr::filter(
     !is.na(SLA),
     !is.na(deltaC13),
     !is.na(FDsnow),
@@ -177,7 +179,7 @@ for (i in seq_along(fecund_cols)) {
   fitness_col <- fecund_cols[i]
 
   year_data <- analysis_data_clean %>%
-    filter(!is.na(.data[[fitness_col]]))
+    dplyr::filter(!is.na(.data[[fitness_col]]))
 
   if (nrow(year_data) < 10) next
 
@@ -189,8 +191,8 @@ for (i in seq_along(fecund_cols)) {
     standardize = TRUE
   )
 
-  lin <- res %>% filter(Type == "Linear")
-  quad <- res %>% filter(Type == "Quadratic")
+  lin <- res %>% dplyr::filter(Type == "Linear")
+  quad <- res %>% dplyr::filter(Type == "Quadratic")
 
   if (nrow(lin) == 0 | nrow(quad) == 0) next
 
@@ -203,7 +205,7 @@ for (i in seq_along(fecund_cols)) {
 }
 
 if (length(yearly_results) > 0) {
-  yearly_summary <- bind_rows(yearly_results)
+  yearly_summary <- dplyr::bind_rows(yearly_results)
   print(yearly_summary)
 }
 
@@ -214,7 +216,7 @@ if (length(yearly_results) > 0) {
 cat("\n7. Saving results\n")
 
 output_dir <- here("R","results","plant_selection_results")
-if (!dir.exists(output_dir)) dir.create(output_dir)
+if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
 # 1. Save the main multivariate results to CSV
 write.csv(multi_trait_result, 
