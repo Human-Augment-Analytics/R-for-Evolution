@@ -3,40 +3,26 @@
 # Full integration test for evolutionary selection package
 # ======================================================
 
+# ------------------------------------------------------
+#Load here package for file path 
+# ------------------------------------------------------
+required_packages <- c(
+  "here"
+)
+
+for (pkg in required_packages) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    install.packages(pkg)
+  }
+  library(pkg, character.only = TRUE)
+  cat("Loaded package:", pkg, "\n")
+}
+
+cat("Project Root:", here(), "\n")
+
 cat("\n========================================\n")
 cat("RUNNING FULL FUNCTION TEST SUITE\n")
 cat("========================================\n")
-
-if (dir.exists("../../R/scripts")) {
-    setwd("../..")
-}
-cat("Working directory:", getwd(), "\n")
-
-# ------------------------------------------------------
-# 1 Initialize environment
-# ------------------------------------------------------
-
-if (file.exists("R/scripts/0.0_initialize.R")) {
-    source("R/scripts/0.0_initialize.R")
-}
-
-# ======================================================
-# 2 Output directories
-# ======================================================
-
-output_dir <- file.path("R", "results", "test_results")
-
-figure_dir <- file.path(output_dir, "figures")
-table_dir <- file.path(output_dir, "tables")
-model_dir <- file.path(output_dir, "models")
-
-dirs <- c(output_dir, figure_dir, table_dir, model_dir)
-
-for (d in dirs) {
-    if (!dir.exists(d)) dir.create(d, recursive = TRUE)
-}
-
-cat("Results saved to:", normalizePath(output_dir), "\n")
 
 # ======================================================
 # Load scripts (pipeline helpers)
@@ -45,7 +31,7 @@ cat("Results saved to:", normalizePath(output_dir), "\n")
 cat("\nLoading script files...\n")
 
 script_files <- list.files(
-    "R/scripts",
+    here("R","scripts"),
     pattern = "\\.R$",
     full.names = TRUE
 )
@@ -57,13 +43,31 @@ for (f in script_files) {
 }
 
 # ======================================================
+# 2 Output directories
+# ======================================================
+
+output_dir <- here("R", "results", "test_all_functions_results")
+
+figure_dir <- file.path(output_dir, "figures")
+table_dir <- file.path(output_dir, "tables")
+model_dir <- file.path(output_dir, "models")
+
+dirs <- c(output_dir, figure_dir, table_dir, model_dir)
+
+for (d in dirs) {
+  if (!dir.exists(d)) dir.create(d, recursive = TRUE)
+}
+
+cat("Results saved to:", normalizePath(output_dir), "\n")
+
+# ======================================================
 # 3 Load functions
 # ======================================================
 
 cat("\nLoading function files...\n")
 
 fn_files <- list.files(
-    "R/functions",
+    here("R","functions"),
     pattern = "\\.R$",
     full.names = TRUE
 )
@@ -81,7 +85,7 @@ for (f in fn_files) {
 cat("\nLoading plotting functions...\n")
 
 plot_files <- list.files(
-    "R/plotting",
+    here("R","plotting"),
     pattern = "\\.R$",
     full.names = TRUE
 )
