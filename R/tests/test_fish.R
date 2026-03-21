@@ -3,7 +3,6 @@
 # =============================================================================
 
 cat("1. Working directory and package initialization\n")
-cat("Current working directory:", getwd(), "\n")
 
 # Initialize environment
 if (file.exists("R/scripts/0.0_initialize.R")) {
@@ -23,6 +22,8 @@ for (pkg in required_packages) {
   library(pkg, character.only = TRUE)
   cat("   Loaded package:", pkg, "\n")
 }
+
+cat("Project Root:", here(), "\n")
 
 # =============================================================================
 # PART 2: LOADING FUNCTIONS
@@ -165,7 +166,7 @@ cat("   Test dataset contains", nrow(test_data), "complete observations\n")
 
 cat("\n4. RUNNING ANALYSES AND RECORDING RESULTS...\n")
 
-results_dir <- here("R", "tests", "function_test_results")
+results_dir <- here("R", "results", "test_fish_results")
 if (!dir.exists(results_dir)) {
   dir.create(results_dir, recursive = TRUE)
   cat("   Created output directory:", results_dir, "\n")

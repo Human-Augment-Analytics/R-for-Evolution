@@ -1,0 +1,297 @@
+---
+title: "Empirical Case Studies in Selection Analysis"
+author: "Stroud Lab"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Empirical Case Studies in Selection Analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 7,
+  fig.height = 5
+)
+
+# Load required packages
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(mgcv)
+library(fields)
+library(here)
+
+# Load framework functions (Assuming execution from the project root)
+fn_files <- list.files(here("R", "functions"), pattern = "\\.R$", full.names = TRUE)
+for (f in fn_files) source(f)
+
+plot_files <- list.files(here("R", "plotting"), pattern = "\\.R$", full.names = TRUE)
+for (f in plot_files) source(f)
+
+script_files <- list.files(here("R", "scripts"), pattern = "\\.R$", full.names = TRUE)
+script_files <- script_files[!grepl("0.0_initialize\\.R$", script_files)]
+for (f in script_files) source(f)
+
+# Helper function to find data files dynamically
+find_data_file <- function(pattern) {
+  files <- list.files(here(), pattern = pattern, recursive = TRUE, full.names = TRUE)
+  if (length(files) > 0) return(files)
+  return(NA)
+}
+```
+
+## Introduction
+
+This vignette demonstrates the complete quantitative genetic framework for analyzing natural selection on phenotypic traits, following the Lande & Arnold (1983) approach. We walk through three famous case studies using datasets representing fish, birds, and plants. 
+
+These examples highlight how to handle both continuous and binary fitness metrics, single-year versus multi-year temporal analyses, and correlational fitness landscapes. By walking through these steps dynamically, you can explore the results directly in this document without having to run the individual test scripts manually.
+
+---
+
+## 1. Puppyfish Case Study: Morphology and Survival
+
+In this first example, we examine survival (binary) and growth (continuous) in Crescent Pond puppyfish based on morphological traits such as jaw, eye, and body size.
+
+### Data Preparation
+
+First, we load and prepare the selection data. The `prepare_selection_data()` function automatically standardizes the traits (mean = 0, variance = 1) and handles missing data.
+
+```{r fish-data}
+crescent_path <- find_data_file("Crescent.*Pond.*\\.csv$")
+crescent_data <- read.csv(crescent_path)
+
+fitness_binary <- "survival"
+fitness_continuous <- "ln.growth"
+morphological_traits <- c("jaw", "eye", "body", "nasal", "mouth", "SL")
+
+test_data <- crescent_data %>%
+  select(all_of(c(fitness_binary, fitness_continuous, morphological_traits))) %>%
+  filter(complete.cases(.))
+
+prepared_binary <- prepare_selection_data(
+  data = test_data,
+  fitness_col = fitness_binary,
+  trait_cols = morphological_traits,
+  standardize = TRUE
+)
+```
+
+### Estimating Selection Coefficients
+
+We can estimate linear directional selection ($\beta$) and nonlinear stabilizing/disruptive selection ($\gamma$) in a single step using `selection_coefficients()`.
+
+```{r fish-selection}
+selection_binary <- selection_coefficients(
+  data = prepared_binary,
+  fitness_col = fitness_binary,
+  trait_cols = morphological_traits,
+  fitness_type = "binary",
+  standardize = FALSE
+)
+
+knitr::kable(head(selection_binary), caption = "Top Selection Gradients for Puppyfish Survival")
+```
+
+### Visualizing Fitness Surfaces
+
+We can visualize univariate and bivariate adaptive landscapes using penalized regression splines.
+
+```{r fish-surface}
+# Univariate fitness spline
+jaw_spline <- univariate_spline(
+  data = prepared_binary,
+  fitness_col = fitness_binary,
+  trait_col = "jaw",
+  fitness_type = "binary",
+  k = 6
+)
+
+plot_univariate_fitness(jaw_spline, trait_col = "jaw") +
+  labs(title = "Fitness Surface: Jaw Size")
+
+# Bivariate (correlational) fitness surface
+tps_result <- correlated_fitness_surface(
+  data = prepared_binary,
+  fitness_col = fitness_binary,
+  trait_cols = c("jaw", "eye"),
+  method = "auto",
+  grid_n = 20
+)
+
+plot_correlated_fitness(tps_result, trait_cols = c("jaw", "eye")) +
+  labs(title = "Bivariate Fitness Surface: Jaw vs Eye")
+```
+
+---
+
+## 2. Darwin's Finches Case Study: Temporal Analysis
+
+Selection pressures often fluctuate across generations. Here, we analyze bird survival across multiple years, focusing on a principal component axis representing beak size (`Beak_PC1`).
+
+### Loading and Processing Bird Data
+
+We'll build a synthetic `Beak_PC1` from raw beak dimensions.
+
+```{r bird-data}
+bird_path <- find_data_file("bird_data\\.csv$")
+bird_study <- read.csv(bird_path, stringsAsFactors = FALSE)
+bird_study <- bird_study[, !grepl("^X\\.y\\.", names(bird_study))]
+
+beak_cols <- c("MedianBeakLength", "MedianBeakWidth", "MedianBeakDepth")
+if (all(beak_cols %in% names(bird_study))) {
+  beak_complete <- bird_study[, beak_cols]
+  ok <- complete.cases(beak_complete)
+  
+  if (sum(ok) > 10) {
+    pca_fit <- prcomp(beak_complete[ok, ], scale. = TRUE)
+    pc1_scores <- rep(NA_real_, nrow(bird_study))
+    pc1_scores[ok] <- pca_fit$x[, 1]
+    
+    # Ensure Beak_PC1 positively correlates with depth
+    cor_depth <- suppressWarnings(cor(pc1_scores[ok], beak_complete[ok, "MedianBeakDepth"]))
+    if (!is.na(cor_depth) && cor_depth < 0) pc1_scores <- -pc1_scores
+    
+    bird_study$Beak_PC1 <- pc1_scores
+  }
+}
+```
+
+### Temporal Selection Analysis
+
+We loop over multiple years of survival data to observe how the quadratic (disruptive/stabilizing) selection coefficient changes.
+
+```{r bird-temporal}
+# Helper to structure data correctly given paper definitions
+prepare_basic_survival_data <- function(year, last_year = 2011) {
+  current_col <- paste0("y.", year)
+  later_cols  <- paste0("y.", (year + 1):last_year)
+  
+  if (!all(c(current_col, later_cols) %in% names(bird_study))) return(NULL)
+  
+  bird_study %>%
+    filter(.data[[current_col]] == 1) %>%
+    mutate(
+      fitness = as.numeric(rowSums(across(all_of(later_cols)), na.rm = TRUE) > 0),
+      year = year
+    )
+}
+
+available_years <- 2003:2010
+yearly_results <- list()
+
+for (year in available_years) {
+  year_data <- prepare_basic_survival_data(year)
+  
+  if (!is.null(year_data) && nrow(year_data) >= 20 && var(year_data$fitness, na.rm = TRUE) > 0) {
+    # Single-trait disruptive selection test
+    df <- year_data %>% filter(!is.na(Beak_PC1), !is.na(fitness))
+    df$Beak_PC1 <- as.numeric(scale(df$Beak_PC1))
+    
+    m <- glm(fitness ~ Beak_PC1 + I(Beak_PC1^2), data = df, family = binomial)
+    coefs <- summary(m)$coefficients
+    
+    if (nrow(coefs) >= 3) {
+      yearly_results[[as.character(year)]] <- data.frame(
+        Year = year,
+        Sample_Size = nrow(df),
+        Quadratic_Coefficient = coefs[3, 1],
+        P_Value = coefs[3, 4],
+        Significant = coefs[3, 4] < 0.05
+      )
+    }
+  }
+}
+
+if (length(yearly_results) > 0) {
+  yearly_summary <- bind_rows(yearly_results)
+  knitr::kable(yearly_summary, caption = "Multi-Year Quadratic Selection Results")
+  
+  ggplot(yearly_summary, aes(x = Year, y = Quadratic_Coefficient, color = Significant)) +
+    geom_point(aes(size = Sample_Size)) +
+    geom_line(alpha = 0.5) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
+    labs(
+      title = "Temporal Variation in Disruptive Selection",
+      subtitle = "Quadratic Selection on Beak Axis (Beak_PC1)",
+      y = "Quadratic Selection Coefficient",
+      size = "Sample Size"
+    ) +
+    scale_color_manual(values = c("FALSE" = "blue", "TRUE" = "red")) +
+    theme_minimal()
+}
+```
+
+---
+
+## 3. Aster Plant Case Study: Correlational Selection
+
+In our final example, we look at plant fecundity (a continuous fitness metric). We analyze multivariate selection gradients and temporal shifts for traits like Specific Leaf Area (`SLA`), carbon isotopes (`deltaC13`), snow-free days (`FDsnow`), and height.
+
+### Structuring Plant Data
+
+We assemble the trait and fitness matrices to capture continuous reproduction variables.
+
+```{r plant-data}
+# Find datasets
+data1_path <- find_data_file("Aster_analyses_2011_Cohort\\.txt$")
+data3_path <- find_data_file("Aster_analyses_2011_Cohort_full\\.txt$")
+
+if (!is.na(data1_path) && !is.na(data3_path)) {
+  data1 <- read.delim(data1_path, sep = "\t")
+  data3 <- read.delim(data3_path, sep = "\t")
+  
+  c13_col <- grep("c13|deltaC13", names(data3), ignore.case = TRUE, value = TRUE)
+  
+  traits_2011 <- data3 %>%
+    select(geno, elevation, season, SLA, !!c13_col, FDsnow, height) %>%
+    rename(deltaC13 = !!c13_col) %>%
+    distinct(geno, season, .keep_all = TRUE)
+  
+  fitness_wide <- data1 %>%
+    select(geno, season, varb, resp) %>%
+    filter(!is.na(resp)) %>%
+    pivot_wider(
+      names_from = c(season, varb),
+      names_sep = "_",
+      names_prefix = "Year",
+      values_from = resp
+    )
+  
+  analysis_data <- traits_2011 %>% left_join(fitness_wide, by = "geno")
+  
+  analysis_data_clean <- analysis_data %>%
+    filter(!is.na(SLA), !is.na(deltaC13), !is.na(FDsnow), !is.na(height))
+  
+  names(analysis_data_clean) <- make.names(names(analysis_data_clean))
+  trait_cols <- c("SLA", "deltaC13", "FDsnow", "height")
+  
+  main_fecund_col <- grep("^Year2013_.*fecund", names(analysis_data_clean), value = TRUE)
+}
+```
+
+### Multivariate Selection Gradients
+
+```{r plant-multivariate}
+if (exists("analysis_data_clean")) {
+  multi_trait_result <- selection_coefficients(
+    data = analysis_data_clean,
+    fitness_col = main_fecund_col,
+    trait_cols = trait_cols,
+    fitness_type = "continuous",
+    standardize = TRUE
+  )
+  
+  knitr::kable(multi_trait_result, caption = "Multivariate Selection Gradients (2013 Fecundity)")
+}
+```
+
+## Summary
+
+This framework provides a unified pipeline to:
+1. Clean, standardize, and format survival and fecundity metrics.
+2. Estimate linear gradients ($\boldsymbol{\beta}$) and nonlinear correlational/disruptive gradients ($\boldsymbol{\gamma}$).
+3. Visualize adaptive landscapes effectively across taxonomic groups.

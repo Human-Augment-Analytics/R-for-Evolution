@@ -1,10 +1,45 @@
 ## 1. SET WORKING DIRECTORY AND LOAD DATA -------------------------------------
 
-cat("Current working directory:", getwd(), "\n")
+# ------------------------------------------------------
+#Load here package for file path 
+# ------------------------------------------------------
+required_packages <- c(
+  "here"
+)
 
-# Load 'here' for path management
-if (!requireNamespace("here", quietly = TRUE)) install.packages("here")
-library(here)
+for (pkg in required_packages) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    install.packages(pkg)
+  }
+  library(pkg, character.only = TRUE)
+  cat("Loaded package:", pkg, "\n")
+}
+
+cat("Project Root:", here(), "\n")
+
+# ------------------------------------------------------
+# 1 Initialize environment
+# ------------------------------------------------------
+if (file.exists(here("R", "scripts", "0.0_initialize.R"))) {
+  source(here("R", "scripts", "0.0_initialize.R"))
+}
+
+# ======================================================
+# Define Output Directories
+# ======================================================
+
+output_dir <- here("R", "results", "test_birds_results")
+figure_dir <- file.path(output_dir, "figures")
+table_dir <- file.path(output_dir, "tables")
+model_dir <- file.path(output_dir, "models")
+
+dirs <- c(output_dir, figure_dir, table_dir, model_dir)
+
+for (d in dirs) {
+  if (!dir.exists(d)) dir.create(d, recursive = TRUE)
+}
+
+cat("Results saved to:", normalizePath(output_dir), "\n")
 
 data_path <- here("R", "data", "bird_data.csv")
 
@@ -70,13 +105,6 @@ for (pkg in required_packages) {
 }
 
 ## 3. LOAD ALL FUNCTIONS -------------------------------------------------------
-
-# ------------------------------------------------------
-# 1 Initialize environment
-# ------------------------------------------------------
-if (file.exists(here("R", "scripts", "0.0_initialize.R"))) {
-  source(here("R", "scripts", "0.0_initialize.R"))
-}
 
 # ------------------------------------------------------
 # 3 Load function files and plotting files
@@ -522,9 +550,6 @@ if (length(yearly_results) > 0) {
 }
 
 ## 8. SAVE RESULTS -------------------------------------------------------------
-
-output_dir <- "selection_analysis_results"
-if (!dir.exists(output_dir)) dir.create(output_dir)
 
 analysis_results <- list(
   analysis_info = list(
