@@ -90,7 +90,7 @@ for (f in plot_files) {
 # Define Output Directories
 # ======================================================
 
-output_dir <- here("R", "results", "extended_tests")
+output_dir <- here("R", "results", "test_extended_tests_results")
 figure_dir <- file.path(output_dir, "figures")
 table_dir <- file.path(output_dir, "tables")
 model_dir <- file.path(output_dir, "models")

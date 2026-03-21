@@ -28,7 +28,7 @@ if (file.exists(here("R", "scripts", "0.0_initialize.R"))) {
 # Define Output Directories
 # ======================================================
 
-output_dir <- here("R", "results", "test_birds")
+output_dir <- here("R", "results", "test_birds_results")
 figure_dir <- file.path(output_dir, "figures")
 table_dir <- file.path(output_dir, "tables")
 model_dir <- file.path(output_dir, "models")

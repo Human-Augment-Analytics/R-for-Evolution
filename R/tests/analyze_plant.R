@@ -3,7 +3,6 @@
 # =============================================================================
 
 cat("1. Working directory and package initialization\n")
-cat("Current working directory:", getwd(), "\n")
 
 required_packages <- c(
   "dplyr", "tidyr", "ggplot2", "mgcv", "fields",
@@ -17,6 +16,8 @@ for (pkg in required_packages) {
   library(pkg, character.only = TRUE)
   cat("Loaded package:", pkg, "\n")
 }
+
+cat("Project Root:", here(), "\n")
 
 cat("\n2. Loading selection analysis functions\n")
 

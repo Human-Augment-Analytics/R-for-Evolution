@@ -7,10 +7,22 @@ cat("\n========================================\n")
 cat("BUMPUS SPARROW FUNCTION TEST\n")
 cat("========================================\n")
 
-if (dir.exists("../../R/scripts")) {
-  setwd("../..")
+# ------------------------------------------------------
+#Load here package for file path 
+# ------------------------------------------------------
+required_packages <- c(
+  "here"
+)
+
+for (pkg in required_packages) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    install.packages(pkg)
+  }
+  library(pkg, character.only = TRUE)
+  cat("Loaded package:", pkg, "\n")
 }
-cat("Working directory:", getwd(), "\n")
+
+cat("Project Root:", here(), "\n")
 
 # ------------------------------------------------------
 # 1 Initialize environment
@@ -24,7 +36,7 @@ if (file.exists("R/scripts/0.0_initialize.R")) {
 # 2 Output directories
 # ------------------------------------------------------
 
-output_dir <- file.path("R", "results", "bumpus_results")
+output_dir <- file.path("R", "results", "test_bumpus_sparrows_results")
 
 table_dir <- file.path(output_dir, "tables")
 figure_dir <- file.path(output_dir, "figures")
@@ -45,7 +57,7 @@ cat("Results will be saved to:", normalizePath(output_dir), "\n")
 cat("\nLoading function files and plotting files...\n")
 
 fn_files <- list.files(
-  "R/functions",
+  here("R","functions"),
   pattern = "\\.R$",
   full.names = TRUE
 )
@@ -57,7 +69,7 @@ for (f in fn_files) {
 
 # Load scripts from R/scripts
 script_files <- list.files(
-  "R/scripts",
+  here("R","scripts"),
   pattern = "\\.R$",
   full.names = TRUE
 )
@@ -71,7 +83,7 @@ for (f in script_files) {
 }
 
 plot_files <- list.files(
-  "R/plotting",
+  here("R","plotting"),
   pattern = "\\.R$",
   full.names = TRUE
 )
@@ -87,7 +99,7 @@ for (f in plot_files) {
 
 cat("\nLoading Bumpus dataset...\n")
 
-data_path <- file.path("R", "data", "Bumpus_data.csv")
+data_path <- here("R", "data", "Bumpus_data.csv")
 
 if (!file.exists(data_path)) {
   stop("Cannot find data/Bumpus_data.csv")
