@@ -47,7 +47,7 @@ univariate_spline <- function(data,
   message("IMPORTANT: Traits should already be standardized (mean = 0, SD = 1).")
   message("           Do NOT apply scale() again within this function.")
 
-  # Check if trait appears to be standardized (optional, very helpful)
+  # Check if trait appears to be standardized
   z_mean <- mean(data[[trait_col]], na.rm = TRUE)
   z_sd <- sd(data[[trait_col]], na.rm = TRUE)
 
