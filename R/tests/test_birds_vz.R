@@ -94,9 +94,14 @@ cat("  Models: ", model_dir, "\n")
 
 cat("\nLoading bird dataset...\n")
 
-data_path <- file.path(base_dir, "data", "bird_data.csv")
+data_path <- file.path(base_dir, "data", "bird.data.RData")
 
-bird_data <- read.csv(data_path, stringsAsFactors = FALSE)
+# Load the data into a temporary environment and assign the first object to bird_data
+# This prevents 'object not found' errors if the saved object is named differently
+temp_env <- new.env()
+load(data_path, envir = temp_env)
+loaded_objs <- ls(temp_env)
+bird_data <- temp_env[[loaded_objs[1]]]
 
 # Remove duplicate X.y.* columns if present
 bird_data <- bird_data[, !grepl("^X\\.y\\.", names(bird_data))]
