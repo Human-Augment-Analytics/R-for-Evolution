@@ -19,7 +19,6 @@ required_packages <- c(
     "ggplot2", # plotting
     "dplyr", # data manipulation
     "tidyr", # data tidying
-    "here", # robust path handling
     "ggrepel", # for text labels in plots
     "viridis",
     "patchwork",
@@ -29,7 +28,7 @@ required_packages <- c(
 
 load_or_install <- function(pkg) {
     if (!require(pkg, character.only = TRUE)) {
-        install.packages(pkg)
+        install.packages(pkg, repos = "https://cloud.r-project.org")
         library(pkg, character.only = TRUE)
     }
 }
