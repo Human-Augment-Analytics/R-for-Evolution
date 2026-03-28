@@ -13,8 +13,13 @@ cat("Working directory:", getwd(), "\n")
 # 1 Initialize environment
 # ------------------------------------------------------
 
-if (file.exists("R/scripts/0.0_initialize.R")) {
-    source("R/scripts/0.0_initialize.R")
+library(dplyr)
+
+# Set a base directory resilient to being run from root or tests/
+base_dir <- if (basename(getwd()) == "tests") ".." else "R"
+
+if (file.exists(file.path(base_dir, "scripts", "0.0_initialize.R"))) {
+    source(file.path(base_dir, "scripts", "0.0_initialize.R"))
 }
 
 # ======================================================
@@ -23,11 +28,9 @@ if (file.exists("R/scripts/0.0_initialize.R")) {
 
 cat("\nLoading script files...\n")
 
-script_files <- list.files(
-    "R/scripts",
+script_files <- list.files(file.path(base_dir, "scripts"),
     pattern = "\\.R$",
-    full.names = TRUE
-)
+    full.names = TRUE)
 
 for (f in script_files) {
     if (basename(f) != "0.0_initialize.R") {
@@ -42,11 +45,9 @@ for (f in script_files) {
 
 cat("\nLoading function files...\n")
 
-fn_files <- list.files(
-    "R/functions",
+fn_files <- list.files(file.path(base_dir, "functions"),
     pattern = "\\.R$",
-    full.names = TRUE
-)
+    full.names = TRUE)
 
 for (f in fn_files) {
     source(f)
@@ -59,11 +60,9 @@ for (f in fn_files) {
 
 cat("\nLoading plotting functions...\n")
 
-plot_files <- list.files(
-    "R/plotting",
+plot_files <- list.files(file.path(base_dir, "plotting"),
     pattern = "\\.R$",
-    full.names = TRUE
-)
+    full.names = TRUE)
 
 for (f in plot_files) {
     source(f)
@@ -74,11 +73,9 @@ for (f in plot_files) {
 # 5 Output directories
 # ======================================================
 
-library(here)
-
 rm(list = intersect(ls(), c("output_dir", "figure_dir", "table_dir", "model_dir")))
 
-output_dir <- here("R", "results", "medium_grouped_finch_results")
+output_dir <- file.path(base_dir, "results", "medium_grouped_finch_results")
 figure_dir <- file.path(output_dir, "figures")
 table_dir <- file.path(output_dir, "tables")
 model_dir <- file.path(output_dir, "models")
@@ -97,9 +94,14 @@ cat("  Models: ", model_dir, "\n")
 
 cat("\nLoading bird dataset...\n")
 
-data_path <- here("R", "data", "bird_data.csv")
+data_path <- file.path(base_dir, "data", "bird.data.RData")
 
-bird_data <- read.csv(data_path, stringsAsFactors = FALSE)
+# Load the data into a temporary environment and assign the first object to bird_data
+# This prevents 'object not found' errors if the saved object is named differently
+temp_env <- new.env()
+load(data_path, envir = temp_env)
+loaded_objs <- ls(temp_env)
+bird_data <- temp_env[[loaded_objs[1]]]
 
 # Remove duplicate X.y.* columns if present
 bird_data <- bird_data[, !grepl("^X\\.y\\.", names(bird_data))]
@@ -254,7 +256,7 @@ for (year in available_years) {
 
             quad_row <- res[res$Term == paste0(beak_trait, "²") & res$Type == "Quadratic", ]
             if (nrow(quad_row) > 0) {
-                cat("    γ (", beak_trait, "²):", round(quad_row$Beta_Coefficient, 4),
+                cat("    Gamma (", beak_trait, "^2):", round(quad_row$Beta_Coefficient, 4),
                     "(p =", round(quad_row$P_Value, 4), ")\n",
                     sep = ""
                 )
@@ -281,8 +283,8 @@ for (year in available_years) {
 
             gamma <- disrupt$Beta_Coefficient[2]
             p_val <- disrupt$P_Value[2]
-            cat("Linear (β):", round(disrupt$Beta_Coefficient[1], 4), "\n")
-            cat("Quadratic (γ):", round(gamma, 4), "\n")
+            cat("Linear (Beta):", round(disrupt$Beta_Coefficient[1], 4), "\n")
+            cat("Quadratic (Gamma):", round(gamma, 4), "\n")
             cat("P-value:", round(p_val, 4), "\n")
 
             if (gamma > 0 && p_val < 0.05) {
@@ -464,7 +466,7 @@ for (yr in names(yearly_results)) {
             Significant = p_val < 0.05
         ))
         cat(
-            "Year", yr, ": γ =", round(gamma, 4), "(p =", round(p_val, 4),
+            "Year", yr, ": Gamma =", round(gamma, 4), "(p =", round(p_val, 4),
             ifelse(p_val < 0.05,
                 ifelse(gamma > 0, "Disruptive", "Stabilizing"),
                 "Not significant"
@@ -490,7 +492,7 @@ if (nrow(summary_df) > 0) {
             ggplot2::labs(
                 title = "Temporal Variation in Disruptive Selection",
                 subtitle = paste("Quadratic selection on", beak_trait),
-                y = "Quadratic Selection Coefficient (γ)",
+                y = expression(paste("Quadratic Selection Coefficient (", gamma, ")")),
                 x = "Year",
                 color = "Significant (p < 0.05)",
                 size = "Sample Size"
@@ -538,6 +540,20 @@ cor(bird_data$Beak_PC1, bird_data$PC.body1, use = "complete.obs")
 # 13 compare_fitness_surfaces (2009 only)
 # ------------------------------------------------------
 
+# Re-prepare the 2009 data
+year_data_raw_2009 <- prepare_survival_data(2009)
+year_2009 <- prepare_selection_data(
+    data = year_data_raw_2009,
+    fitness_col = "Survived",
+    trait_cols = TRAITS,
+    standardize = TRUE,
+    add_relative = FALSE,
+    na_action = "warn"
+)
+
+# Extract the correlated fitness surface for 2009 from the loop results
+cfs_2009 <- yearly_results[["2009"]]$cfs
+
 gam_model_2009 <- mgcv::gam(
     Survived ~ s(Beak_PC1, PC.body1),
     family = binomial,
@@ -554,7 +570,7 @@ landscape_2009 <- adaptive_landscape(
 
 if (exists("compare_fitness_surfaces_data") &&
     exists("plot_fitness_surfaces_comparison") &&
-    exists("landscape")) {
+    exists("adaptive_landscape")) {
     cat("\n=== Testing Surface Comparison (2009) ===\n")
 
     trait_cols <- c("Beak_PC1", "PC.body1")

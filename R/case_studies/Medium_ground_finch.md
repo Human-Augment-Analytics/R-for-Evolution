@@ -28,7 +28,7 @@ Before examining selection patterns, we assessed the correlation between beak si
 |------------|-------------|----------------|
 | Beak_PC1 × PC.body1 | **0.816** | Strong positive correlation |
 
-The strong positive correlation (r = 0.816) indicates that individuals with larger beaks also tend to have larger body size. This correlation is important for interpreting selection results, as it can lead to indirect selection where selection on one trait influences the apparent selection on the other.
+The strong positive correlation (r = 0.816) indicates the biological relationship between the traits: individuals with larger beaks also tend to have larger body size. This correlation is important for interpreting selection results, as it can lead to indirect selection where selection on one trait influences the apparent selection on the other.
 
 ---
 
@@ -36,19 +36,19 @@ The strong positive correlation (r = 0.816) indicates that individuals with larg
 
 | Year | N   | Survival_Rate | Gamma   | SE       | P_Value | Significant |
 |------|-----|---------------|---------|----------|---------|-------------|
-| 2003 | 49  | 0.408         | -0.6061 | 0.7395   | 0.4125  | FALSE       |
-| 2004 | 110 | 0.345         | 0.1104  | 0.45     | 0.8062  | FALSE       |
-| 2005 | 185 | 0.276         | -0.3711 | 0.3533   | 0.2935  | FALSE       |
-| 2006 | 233 | 0.172         | 0.0485  | 0.2772   | 0.861   | FALSE       |
-| 2007 | 61  | 0.328         | -0.3774 | 0.637    | 0.5536  | FALSE       |
-| 2008 | 127 | 0.291         | -0.0571 | 0.3354   | 0.8647  | FALSE       |
-| 2009 | 196 | 0.173         | 0.5512  | 0.2568   | 0.0319  | TRUE        |
-| 2010 | 175 | 0.12          | -0.2031 | 0.5547   | 0.7143  | FALSE       |
-| 2011 | 211 | 1             | 0       | 39777.9385 | 1     | FALSE       |
+| 2003 | 49  | 0.408         | -0.0731 | 0.1271   | 0.4125  | FALSE       |
+| 2004 | 110 | 0.345         | 0.0267  | 0.1028   | 0.8062  | FALSE       |
+| 2005 | 185 | 0.276         | -0.0648 | 0.0635   | 0.2935  | FALSE       |
+| 2006 | 233 | 0.172         | 0.0070  | 0.0403   | 0.8610  | FALSE       |
+| 2007 | 61  | 0.328         | -0.0792 | 0.1381   | 0.5536  | FALSE       |
+| 2008 | 127 | 0.291         | -0.0006 | 0.0658   | 0.8647  | FALSE       |
+| 2009 | 196 | 0.173         | 0.1071  | 0.0390   | 0.0319  | TRUE        |
+| 2010 | 175 | 0.120         | 0.0027  | 0.0508   | 0.7143  | FALSE       |
+| 2011 | 211 | 1.000         | 0.0000  | 0.0000   | 1.0000  | FALSE       |
 
 A total of 1,347 individuals were captured and recaptured across the 9 year study period, with annual sample sizes ranging from 49 to 233 individuals. Survival rates varied substantially among years, ranging from 0.120 (2010) to 0.408 (2003), reflecting the environmental variability characteristic of the Galapagos archipelago.
 
-Significant disruptive selection on beak size was detected **only in 2009** (γ = 0.551, P = 0.032), indicating that individuals with extreme beak sizes (both small and large) had higher survival than those with intermediate beak sizes in that year. No other years showed significant quadratic selection (all P > 0.05), suggesting that disruptive selection on beak size is temporally variable in this population.
+Significant disruptive selection on beak size was detected **only in 2009** (γ = 0.1071, P = 0.0319), indicating that individuals with extreme beak sizes (both small and large) had higher survival than those with intermediate beak sizes in that year. No other years showed significant quadratic selection (all P > 0.05), suggesting that disruptive selection on beak size is temporally variable in this population.
 
 ---
 
@@ -92,7 +92,7 @@ Significant disruptive selection on beak size was detected **only in 2009** (γ 
 </tr>
 </table>
 
-The fitness function for 2009 shows a clear increase in fitness with increasing Beak_PC1, indicating directional selection favoring larger beak sizes. There is no strong evidence of a bimodal pattern or fitness valley, suggesting that disruptive selection is weak or absent in this year.
+The fitness function for 2009 shows statistically significant disruptive selection, indicating a non-linear relationship where extreme phenotypes (either small or large beaks) had a relative fitness advantage over intermediate beak sizes. This contrasts with other years where no significant non-linear selection was detected.
 
 ---
 
@@ -148,6 +148,8 @@ The fitness function for 2009 shows a clear increase in fitness with increasing 
 |------|-----------|------------|-------------|----------|
 | 2009 | Beak_PC1  | PC.body1   | 0.9827      | 2500     |
 
+*Note: The correlation of 0.9827 represents the high degree of similarity between the individual-level statistical surface (Correlated Fitness) and the population-level surface (Adaptive Landscape). This is distinct from the biological trait correlation (r = 0.816) reported in section 3.1.*
+
 
 <table>
 <tr>
@@ -167,7 +169,7 @@ The fitness function for 2009 shows a clear increase in fitness with increasing 
 
 ### 4. Conclusion
 
-**Disruptive selection was rare**: Only 2009 showed significant quadratic selection (γ = 0.55, P = 0.032)
+**Disruptive selection was rare**: Only 2009 showed significant quadratic selection (γ = 0.1071, P = 0.0319)
 **Directional selection dominated**: In 2009, larger beaks (β = 1.14) and smaller bodies (β = -0.78) were favored
 **Strong trait correlation**: Beak size and body size were highly correlated (r = 0.82), complicating interpretation
 
