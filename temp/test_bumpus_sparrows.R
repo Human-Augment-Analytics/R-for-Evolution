@@ -13,8 +13,12 @@ cat("Working directory:", getwd(), "\n")
 # 1 Initialize environment
 # ------------------------------------------------------
 
-if (file.exists("R/scripts/0.0_initialize.R")) {
-    source("R/scripts/0.0_initialize.R")
+# Determine relative paths based on current directory
+proj_root <- ifelse(basename(getwd()) == "temp", "..", ".")
+r_dir <- file.path(proj_root, "R")
+
+if (file.exists(file.path(r_dir, "0.0_initialize.R"))) {
+    source(file.path(r_dir, "0.0_initialize.R"))
 }
 
 # ======================================================
@@ -24,7 +28,7 @@ if (file.exists("R/scripts/0.0_initialize.R")) {
 cat("\nLoading script files...\n")
 
 script_files <- list.files(
-    "R/scripts",
+    r_dir,
     pattern = "\\.R$",
     full.names = TRUE
 )
@@ -43,7 +47,7 @@ for (f in script_files) {
 cat("\nLoading function files...\n")
 
 fn_files <- list.files(
-    "R/functions",
+    r_dir,
     pattern = "\\.R$",
     full.names = TRUE
 )
@@ -60,7 +64,7 @@ for (f in fn_files) {
 cat("\nLoading plotting functions...\n")
 
 plot_files <- list.files(
-    "R/plotting",
+    r_dir,
     pattern = "\\.R$",
     full.names = TRUE
 )
@@ -74,11 +78,9 @@ for (f in plot_files) {
 # 5 Output directories (defined AFTER scripts)
 # ======================================================
 
-library(here)
-
 rm(list = intersect(ls(), c("output_dir", "figure_dir", "table_dir", "model_dir")))
 
-output_dir <- here("R", "results", "bumpus_sparrows_results")
+output_dir <- file.path(r_dir, "bumpus_sparrows_results")
 figure_dir <- file.path(output_dir, "figures")
 table_dir <- file.path(output_dir, "tables")
 model_dir <- file.path(output_dir, "models")
@@ -98,10 +100,10 @@ cat("  Models: ", model_dir, "\n")
 
 cat("\nLoading Bumpus dataset...\n")
 
-data_path <- here("R", "data", "Bumpus_data.csv")
+data_path <- file.path(proj_root, "temp", "data", "Bumpus_data.csv")
 
 if (!file.exists(data_path)) {
-    stop("Cannot find data/Bumpus_data.csv")
+    stop(paste("Cannot find data file at:", data_path))
 }
 
 bumpus <- read.csv(data_path)
