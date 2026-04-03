@@ -15,11 +15,12 @@ cat("Working directory:", getwd(), "\n")
 
 library(dplyr)
 
-# Set a base directory resilient to being run from root or tests/
-base_dir <- if (basename(getwd()) == "tests") ".." else "R"
+# Determine relative paths based on current directory
+proj_root <- ifelse(basename(getwd()) == "temp", "..", ".")
+r_dir <- file.path(proj_root, "R")
 
-if (file.exists(file.path(base_dir, "scripts", "0.0_initialize.R"))) {
-    source(file.path(base_dir, "scripts", "0.0_initialize.R"))
+if (file.exists(file.path(r_dir, "0.0_initialize.R"))) {
+    source(file.path(r_dir, "0.0_initialize.R"))
 }
 
 # ======================================================
@@ -28,7 +29,7 @@ if (file.exists(file.path(base_dir, "scripts", "0.0_initialize.R"))) {
 
 cat("\nLoading script files...\n")
 
-script_files <- list.files(file.path(base_dir, "scripts"),
+script_files <- list.files(r_dir,
     pattern = "\\.R$",
     full.names = TRUE)
 
@@ -45,7 +46,7 @@ for (f in script_files) {
 
 cat("\nLoading function files...\n")
 
-fn_files <- list.files(file.path(base_dir, "functions"),
+fn_files <- list.files(r_dir,
     pattern = "\\.R$",
     full.names = TRUE)
 
@@ -60,7 +61,7 @@ for (f in fn_files) {
 
 cat("\nLoading plotting functions...\n")
 
-plot_files <- list.files(file.path(base_dir, "plotting"),
+plot_files <- list.files(r_dir,
     pattern = "\\.R$",
     full.names = TRUE)
 
@@ -75,7 +76,7 @@ for (f in plot_files) {
 
 rm(list = intersect(ls(), c("output_dir", "figure_dir", "table_dir", "model_dir")))
 
-output_dir <- file.path(base_dir, "results", "medium_grouped_finch_results")
+output_dir <- file.path(r_dir, "results", "medium_grouped_finch_results")
 figure_dir <- file.path(output_dir, "figures")
 table_dir <- file.path(output_dir, "tables")
 model_dir <- file.path(output_dir, "models")
@@ -94,7 +95,7 @@ cat("  Models: ", model_dir, "\n")
 
 cat("\nLoading bird dataset...\n")
 
-data_path <- file.path(base_dir, "data", "bird.data.RData")
+data_path <- file.path(proj_root, "temp", "data", "bird.data.RData")
 
 # Load the data into a temporary environment and assign the first object to bird_data
 # This prevents 'object not found' errors if the saved object is named differently

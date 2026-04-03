@@ -9,12 +9,17 @@ cat("========================================\n")
 
 cat("Working directory:", getwd(), "\n")
 
+# Determine relative path to the R folder based on current directory
+proj_root <- ifelse(dir.exists("R"), ".", "..")
+r_dir <- file.path(proj_root, "R")
+
 # ------------------------------------------------------
 # 1 Initialize environment
 # ------------------------------------------------------
 
-if (file.exists("R/scripts/0.0_initialize.R")) {
-    source("R/scripts/0.0_initialize.R")
+init_script <- file.path(r_dir, "0.0_initialize.R")
+if (file.exists(init_script)) {
+    source(init_script)
 }
 
 # ======================================================
@@ -24,7 +29,7 @@ if (file.exists("R/scripts/0.0_initialize.R")) {
 cat("\nLoading script files...\n")
 
 script_files <- list.files(
-    "R/scripts",
+    r_dir,
     pattern = "\\.R$",
     full.names = TRUE
 )
@@ -43,7 +48,7 @@ for (f in script_files) {
 cat("\nLoading function files...\n")
 
 fn_files <- list.files(
-    "R/functions",
+    r_dir,
     pattern = "\\.R$",
     full.names = TRUE
 )
@@ -60,7 +65,7 @@ for (f in fn_files) {
 cat("\nLoading plotting functions...\n")
 
 plot_files <- list.files(
-    "R/plotting",
+    r_dir,
     pattern = "\\.R$",
     full.names = TRUE
 )
@@ -74,11 +79,9 @@ for (f in plot_files) {
 # 2 Output directories
 # ======================================================
 
-library(here)
-
 rm(list = intersect(ls(), c("output_dir", "figure_dir", "table_dir", "model_dir")))
 
-output_dir <- here("R", "results", "test_results")
+output_dir <- file.path(r_dir, "results", "test_results")
 figure_dir <- file.path(output_dir, "figures")
 table_dir <- file.path(output_dir, "tables")
 model_dir <- file.path(output_dir, "models")
@@ -238,6 +241,8 @@ write.csv(weighted_df, file.path(table_dir, "selection_differentials_weighted.cs
 univariate_dir <- file.path(figure_dir, "univariate")
 if (!dir.exists(univariate_dir)) dir.create(univariate_dir, recursive = TRUE)
 
+univariate_plots <- list()
+
 prepared_global <- prepare_selection_data(
     data = df_continuous,
     fitness_col = FITNESS,
@@ -262,6 +267,8 @@ for (trait in TRAITS) {
         trait_col = trait,
         title = paste("Global:", trait)
     )
+
+    univariate_plots[[trait]] <- p
 
     ggsave(
         file.path(univariate_dir, paste0("global_", trait, ".png")),
@@ -463,6 +470,26 @@ for (pair in trait_pairs) {
 
 cat("Correlated fitness surfaces Done\n")
 
+
+# ======================================================
+# 10 bootstrap_selection
+# ======================================================
+
+cat("\nTesting bootstrap_selection...\n")
+
+if (exists("bootstrap_selection")) {
+    tryCatch({
+        boot <- bootstrap_selection(
+            data = df_continuous,
+            fitness_col = FITNESS,
+            trait_cols = c("size", "speed"),
+            fitness_type = "continuous"
+        )
+        cat("Bootstrap selection Done\n")
+    }, error = function(e) {
+        cat("Failed for bootstrap_selection:", e$message, "\n")
+    })
+}
 
 # ======================================================
 # 11 adaptive landscape (with group)

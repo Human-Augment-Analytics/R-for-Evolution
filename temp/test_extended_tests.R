@@ -7,28 +7,21 @@ cat("\n========================================\n")
 cat("RUNNING FULL FUNCTION TEST SUITE\n")
 cat("========================================\n")
 
-required_packages <- c(
-  "here"
-)
+cat("Working directory:", getwd(), "\n")
 
-for (pkg in required_packages) {
-  if (!requireNamespace(pkg, quietly = TRUE)) {
-    install.packages(pkg, repos = "https://cloud.r-project.org")
-  }
-  library(pkg, character.only = TRUE)
-  cat("Loaded package:", pkg, "\n")
-}
+# Determine relative path to the R folder based on current directory
+proj_root <- ifelse(dir.exists("R"), ".", "..")
+r_dir <- file.path(proj_root, "R")
 
 set.seed(123)
-
-cat("Project Root:", here(), "\n")
 
 # ------------------------------------------------------
 # 1 Initialize environment
 # ------------------------------------------------------
 
-if (file.exists(here("R","scripts","/0.0_initialize.R"))) {
-  source(here("R","scripts","/0.0_initialize.R"))
+init_script <- file.path(r_dir, "0.0_initialize.R")
+if (file.exists(init_script)) {
+  source(init_script)
 }
 
 # ======================================================
@@ -42,7 +35,7 @@ if (file.exists(here("R","scripts","/0.0_initialize.R"))) {
 cat("\nLoading script files...\n")
 
 script_files <- list.files(
-  here("R","scripts"),
+  r_dir,
   pattern = "\\.R$",
   full.names = TRUE
 )
@@ -59,7 +52,7 @@ for (f in script_files) {
 cat("\nLoading function files...\n")
 
 fn_files <- list.files(
-  here("R","functions"),
+  r_dir,
   pattern = "\\.R$",
   full.names = TRUE
 )
@@ -76,7 +69,7 @@ for (f in fn_files) {
 cat("\nLoading plotting functions...\n")
 
 plot_files <- list.files(
-  here("R","plotting"),
+  r_dir,
   pattern = "\\.R$",
   full.names = TRUE
 )
@@ -90,7 +83,7 @@ for (f in plot_files) {
 # Define Output Directories
 # ======================================================
 
-output_dir <- here("R", "results", "test_extended_tests_results")
+output_dir <- file.path(r_dir, "test_extended_tests_results")
 figure_dir <- file.path(output_dir, "figures")
 table_dir <- file.path(output_dir, "tables")
 model_dir <- file.path(output_dir, "models")
