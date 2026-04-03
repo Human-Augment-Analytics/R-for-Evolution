@@ -306,8 +306,6 @@ for (trait in TRAITS) {
         dpi = 300
     )
 }
-cat("✓ Fixed effects plots saved\n")
-
 
 years <- unique(df_continuous$year)
 for (trait in TRAITS) {

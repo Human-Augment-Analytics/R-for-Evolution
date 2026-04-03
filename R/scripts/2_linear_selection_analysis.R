@@ -15,14 +15,14 @@
 #
 # Workflow:
 #   Continuous fitness:
-#     1. Fit OLS model → coefficients = selection gradients (β)
+#     1. Fit OLS model -> coefficients = selection gradients (β)
 #     2. p-values come directly from OLS summary
 #     3. Type III ANOVA (car::Anova) for significance of each term
 #     4. Check VIF for multicollinearity
 #
 #   Binary fitness:
-#     1. Fit OLS model → coefficients = selection gradients (β)
-#     2. Fit logistic GLM model → p-values from Wald tests (Type III)
+#     1. Fit OLS model -> coefficients = selection gradients (β)
+#     2. Fit logistic GLM model -> p-values from Wald tests (Type III)
 #     3. Check convergence and separation
 #     4. Type III ANOVA on GLM for overall term significance
 #     5. Check VIF using OLS (GLM VIF not directly comparable)

@@ -28,8 +28,7 @@
 #
 # Returns:
 #   For continuous: list with model_ols, summary_ols, anova, vif, fitness_type
-#   For binary: list with model_ols, model_glm, summary_ols, summary_glm,
-#               anova (from GLM), vif, fitness_type
+#   For binary: list with model_ols, model_glm, summary_ols, summary_glm, anova (from GLM), vif, fitness_type
 # ============================================================================
 
 analyze_nonlinear_selection <- function(data, fitness_col, trait_cols, fitness_type) {

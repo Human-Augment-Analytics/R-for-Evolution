@@ -17,7 +17,6 @@
 #   - DO NOT use scale() within this function (double standardization)
 # ======================================================
 
-
 univariate_spline <- function(data,
                               fitness_col,
                               trait_col,

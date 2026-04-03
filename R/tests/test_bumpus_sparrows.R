@@ -128,7 +128,6 @@ cat("Survival rate:", mean(bumpus$Survived), "\n")
 TRAITS <- c("TL", "HL", "WT", "KL")
 FITNESS <- "Survived"
 
-
 # ------------------------------------------------------
 # 6 selection_coefficients
 # ------------------------------------------------------
@@ -140,6 +139,11 @@ selection_results <- list()
 for (k in seq_along(TRAITS)) {
     traits <- TRAITS[1:k]
     name <- paste(traits, collapse = "_")
+
+    if (k == 1) {
+        cat("\n---", name, "(skipped: single trait requires at least 2 traits) ---\n")
+        next
+    }
 
     tryCatch(
         {
@@ -158,6 +162,14 @@ for (k in seq_along(TRAITS)) {
                 file.path(table_dir, paste0("selection_", name, ".csv")),
                 row.names = FALSE
             )
+
+            sig <- res[res$P_Value < 0.05, ]
+
+            if (nrow(sig) > 0) {
+                cat("Significant terms:", paste(sig$Term, collapse = ", "), "\n")
+            } else {
+                cat("No significant terms detected\n")
+            }
         },
         error = function(e) {
             cat("FAILED:", name, "-", e$message, "\n")
@@ -204,133 +216,7 @@ write.csv(
 )
 
 # ------------------------------------------------------
-# 8 univariate_spline + plotting
-# ------------------------------------------------------
-cat("\nTesting univariate spline + plotting...\n")
-
-for (trait in TRAITS) {
-    tryCatch(
-        {
-            spline <- univariate_spline(
-                data = bumpus,
-                fitness_col = FITNESS,
-                trait_col = trait,
-                fitness_type = "binary"
-            )
-
-            saveRDS(
-                spline,
-                file.path(model_dir, paste0("spline_", trait, ".rds"))
-            )
-
-            if (exists("plot_univariate_fitness")) {
-                p <- plot_univariate_fitness(
-                    uni = spline,
-                    trait_col = trait,
-                    title = paste("Survival vs", trait)
-                )
-
-                print(p)
-
-                ggplot2::ggsave(
-                    file.path(figure_dir, paste0("univariate_", trait, ".png")),
-                    p,
-                    width = 7,
-                    height = 5,
-                    dpi = 300
-                )
-
-                cat("Plot saved for:", trait, "\n")
-            } else {
-                cat("plot_univariate_fitness function not found\n")
-            }
-
-            cat("Spline OK:", trait, "\n")
-        },
-        error = function(e) {
-            cat("FAILED:", trait, "-", e$message, "\n")
-        }
-    )
-}
-
-
-# ------------------------------------------------------
-# 9 correlated_fitness_surface + plots
-# ------------------------------------------------------
-
-cat("\nTesting correlated fitness surfaces...\n")
-
-pairs <- combn(TRAITS, 2, simplify = FALSE)
-
-cfs_results <- list()
-
-for (pair in pairs) {
-    name <- paste(pair, collapse = "_")
-
-    complete_cases <- sum(complete.cases(bumpus[, c(FITNESS, pair)]))
-    cat("\n---", name, "---\n")
-    cat("  Complete cases:", complete_cases, "\n")
-
-    if (complete_cases < 10) {
-        cat("  SKIP: Insufficient complete cases (<10)\n")
-        next
-    }
-
-    tryCatch(
-        {
-            res <- correlated_fitness_surface(
-                data = bumpus,
-                fitness_col = FITNESS,
-                trait_cols = pair,
-                grid_n = 30,
-                method = "gam"
-            )
-
-            cfs_results[[name]] <- res
-
-            saveRDS(
-                res,
-                file.path(model_dir, paste0("cfs_", name, ".rds"))
-            )
-
-            if (exists("plot_correlated_fitness")) {
-                p <- plot_correlated_fitness(res, pair)
-                print(p)
-
-                ggsave(
-                    file.path(figure_dir, paste0("cfs_", name, ".png")),
-                    p,
-                    width = 8,
-                    height = 6,
-                    dpi = 300
-                )
-
-                if (exists("plot_correlated_fitness_enhanced")) {
-                    p_enhanced <- plot_correlated_fitness_enhanced(
-                        res,
-                        pair,
-                        original_data = bumpus,
-                        fitness_col = FITNESS
-                    )
-
-                    ggsave(
-                        file.path(figure_dir, paste0("cfs_", name, "_enhanced.png")),
-                        p_enhanced,
-                        width = 8,
-                        height = 6,
-                        dpi = 300
-                    )
-                }
-            }
-        },
-        error = function(e) {
-            cat("  FAILED:", e$message, "\n")
-        }
-    )
-}
-
-# ------------------------------------------------------
-# 10 analyze_disruptive_selection
+# 8 analyze_disruptive_selection
 # ------------------------------------------------------
 
 cat("\nTesting disruptive selection...\n")
@@ -355,20 +241,6 @@ for (trait in TRAITS) {
                 file.path(table_dir, paste0("disruptive_", trait, ".csv")),
                 row.names = FALSE
             )
-
-            cat("\n---", trait, "---\n")
-            print(res)
-
-            gamma <- res$Beta_Coefficient[2]
-            p_quad <- res$P_Value[2]
-
-            if (gamma < 0 && p_quad < 0.05) {
-                cat("Stabilizing selection (γ =", round(gamma, 4), ", P =", round(p_quad, 4), ")\n")
-            } else if (gamma > 0 && p_quad < 0.05) {
-                cat("Disruptive selection (γ =", round(gamma, 4), ", P =", round(p_quad, 4), ")\n")
-            } else {
-                cat("No significant nonlinear selection (γ =", round(gamma, 4), ", P =", round(p_quad, 4), ")\n")
-            }
         },
         error = function(e) {
             cat("FAILED:", trait, "-", e$message, "\n")
@@ -391,260 +263,386 @@ if (length(disruptive_results) > 0) {
         file.path(table_dir, "disruptive_selection_summary.csv"),
         row.names = FALSE
     )
+}
 
-    cat("\n=== Disruptive Selection Summary ===\n")
-    print(summary_df)
+
+# ------------------------------------------------------
+# 9 univariate_spline + plotting
+# ------------------------------------------------------
+cat("\nTesting univariate spline + plotting...\n")
+
+prepared_bumpus <- prepare_selection_data(
+    data = bumpus,
+    fitness_col = FITNESS,
+    trait_cols = TRAITS,
+    standardize = TRUE,
+    group = NULL,
+    add_relative = TRUE,
+    na_action = "warn"
+)
+
+for (trait in TRAITS) {
+    tryCatch(
+        {
+            spline <- univariate_spline(
+                data = prepared_bumpus,
+                fitness_col = FITNESS,
+                trait_col = trait,
+                fitness_type = "binary"
+            )
+
+            saveRDS(
+                spline,
+                file.path(model_dir, paste0("spline_", trait, ".rds"))
+            )
+
+            if (exists("plot_univariate_fitness")) {
+                p <- plot_univariate_fitness(
+                    uni = spline,
+                    trait_col = trait,
+                    title = paste("Survival vs", trait)
+                )
+
+                ggplot2::ggsave(
+                    file.path(figure_dir, paste0("univariate_", trait, ".png")),
+                    p,
+                    width = 7,
+                    height = 5,
+                    dpi = 300
+                )
+
+                cat("Plot saved for:", trait, "\n")
+            } else {
+                cat("plot_univariate_fitness function not found\n")
+            }
+        },
+        error = function(e) {
+            cat("FAILED:", trait, "-", e$message, "\n")
+        }
+    )
+}
+
+# ------------------------------------------------------
+# 9 correlated_fitness_surface + plots
+# ------------------------------------------------------
+cat("\nTesting correlated fitness surface + plotting...\n")
+
+trait_pairs <- combn(TRAITS, 2, simplify = FALSE)
+
+cfs_results <- list()
+cfs_plots <- list()
+
+for (pair in trait_pairs) {
+    pair_name <- paste(pair, collapse = "_")
+
+    tryCatch(
+        {
+            cfs <- correlated_fitness_surface(
+                data = prepared_bumpus,
+                fitness_col = FITNESS,
+                trait_cols = pair,
+                grid_n = 60,
+                method = "auto",
+                scale_traits = FALSE,
+                group = NULL,
+                k = 30
+            )
+
+            cfs_results[[pair_name]] <- cfs
+
+            saveRDS(cfs, file.path(model_dir, paste0("cfs_", pair_name, ".rds")))
+
+            write.csv(cfs$grid,
+                file.path(table_dir, paste0("cfs_", pair_name, "_grid.csv")),
+                row.names = FALSE
+            )
+
+            if (exists("plot_correlated_fitness")) {
+                plot <- plot_correlated_fitness(
+                    tps = cfs,
+                    trait_cols = pair
+                )
+
+                cfs_plots[[pair_name]] <- plot
+
+                ggplot2::ggsave(
+                    file.path(figure_dir, paste0("cfs_", pair_name, ".png")),
+                    plot,
+                    width = 8,
+                    height = 6,
+                    dpi = 300
+                )
+            }
+
+            if (exists("plot_correlated_fitness_enhanced")) {
+                plot_enhanced <- plot_correlated_fitness_enhanced(
+                    tps = cfs,
+                    trait_cols = pair,
+                    original_data = prepared_bumpus,
+                    fitness_col = FITNESS
+                )
+
+                ggplot2::ggsave(
+                    file.path(figure_dir, paste0("cfs_", pair_name, "_enhanced.png")),
+                    plot_enhanced,
+                    width = 10,
+                    height = 8,
+                    dpi = 300
+                )
+            }
+        },
+        error = function(e) {
+            cat("FAILED:", trait, "-", e$message, "\n")
+        }
+    )
+}
+
+if (length(cfs_results) > 0) {
+    summary_df <- data.frame(
+        pair = names(cfs_results),
+        method = sapply(cfs_results, function(x) x$method),
+        data_type = sapply(cfs_results, function(x) x$data_type),
+        grid_points = sapply(cfs_results, function(x) nrow(x$grid))
+    )
+
+    write.csv(
+        summary_df,
+        file.path(table_dir, "correlated_fitness_surfaces_summary.csv"),
+        row.names = FALSE
+    )
 }
 
 # ------------------------------------------------------
 # 11 adaptive landscape
 # ------------------------------------------------------
 if (exists("adaptive_landscape")) {
-    cat("\n=== Testing Adaptive Landscape ===\n")
-
-    bumpus_std <- prepare_selection_data(
-        data = bumpus,
-        fitness_col = "Survived",
-        trait_cols = c("TL", "HL", "WT", "KL"),
-        standardize = TRUE,
-        add_relative = FALSE
-    )
-
-    bumpus_std_points <- bumpus
-    bumpus_std_points$TL <- scale(bumpus_std_points$TL)
-    bumpus_std_points$KL <- scale(bumpus_std_points$KL)
-
-    fitness_model <- mgcv::gam(
-        Survived ~ s(TL, KL),
-        family = binomial,
-        data = bumpus_std
-    )
-
-    landscape <- adaptive_landscape(
-        data = bumpus_std,
-        fitness_model = fitness_model,
-        trait_cols = c("TL", "KL"),
-        simulation_n = 500,
-        grid_n = 50
-    )
-
-    saveRDS(
-        landscape,
-        file.path(model_dir, "adaptive_landscape.rds")
-    )
-
-    # 2D adaptive landscape plot
-    if (exists("plot_adaptive_landscape")) {
-        cat("\nGenerating 2D adaptive landscape...\n")
-
-        p2d <- plot_adaptive_landscape(
-            landscape = landscape,
-            trait_cols = c("TL", "KL"),
-            original_data = bumpus_std_points,
-            bins = 12
-        )
-
-        ggsave(
-            file.path(figure_dir, "adaptive_landscape_2d.png"),
-            p2d,
-            width = 8,
-            height = 6,
-            dpi = 300
-        )
-    }
-
-    # 3D adaptive landscape plot
-    if (exists("plot_adaptive_landscape_3d")) {
-        png(
-            file.path(figure_dir, "adaptive_landscape_3d.png"),
-            width = 8,
-            height = 6,
-            units = "in",
-            res = 300
-        )
-
-        plot_adaptive_landscape_3d(
-            landscape = landscape,
-            trait_cols = c("TL", "KL"),
-            theta = -30,
-            phi = 30,
-            grid_n = 200
-        )
-
-        dev.off()
-
-        angles <- list(
-            c(-30, 30), # default
-            c(0, 30), # front view
-            c(-60, 20), # side view
-            c(30, 40), # back-right view
-            c(-90, 30) # left side view
-        )
-
-        for (i in seq_along(angles)) {
-            png(
-                file.path(figure_dir, paste0("adaptive_landscape_3d_angle", i, ".png")),
-                width = 8,
-                height = 6,
-                units = "in",
-                res = 300
-            )
-
-            plot_adaptive_landscape_3d(
-                landscape = landscape,
-                trait_cols = c("TL", "KL"),
-                theta = angles[[i]][1],
-                phi = angles[[i]][2],
-                grid_n = 200
-            )
-
-            dev.off()
-        }
-    }
-
-    cat("\n=== Adaptive Landscape Summary ===\n")
-    cat("Optimal population mean:\n")
-    cat("  TL (Beak Length):", round(landscape$optimum$TL, 3), "\n")
-    cat("  KL (Beak Depth):", round(landscape$optimum$KL, 3), "\n")
-    cat("  Mean fitness at optimum:", round(landscape$optimum$.mean_fit, 3), "\n")
-
-    summary_df <- data.frame(
-        Metric = c("Optimal TL", "Optimal KL", "Optimal Fitness"),
-        Value = c(
-            round(landscape$optimum$TL, 3),
-            round(landscape$optimum$KL, 3),
-            round(landscape$optimum$.mean_fit, 3)
-        )
-    )
-    write.csv(summary_df, file.path(table_dir, "adaptive_landscape_summary.csv"), row.names = FALSE)
-    cat("\n  Summary saved to:", file.path(table_dir, "adaptive_landscape_summary.csv"), "\n")
-} else {
-    cat("\n Skipping adaptive_landscape (function not found)\n")
-}
-
-# ------------------------------------------------------
-# 12 compare_fitness_surfaces
-# ------------------------------------------------------
-if (exists("compare_fitness_surfaces_data") &&
-    exists("plot_fitness_surfaces_comparison") &&
-    exists("cfs_results") &&
-    length(cfs_results) > 0 &&
-    exists("landscape")) {
-    cat("\n=== Testing Surface Comparison ===\n")
-
     tryCatch(
         {
-            all_pairs <- names(cfs_results)
-            comparison_results <- list()
+            trait_combinations <- list(
+                c("TL", "HL"),
+                c("TL", "WT"),
+                c("TL", "KL"),
+                c("HL", "WT"),
+                c("HL", "KL"),
+                c("WT", "KL")
+            )
 
-            for (pair_name in all_pairs) {
-                cat("\n--- Comparing", pair_name, "---\n")
+            for (traits in trait_combinations) {
+                pair_name <- paste(traits, collapse = "_")
 
-                trait_cols <- cfs_results[[pair_name]]$trait_cols
-
-                comparison_data <- compare_fitness_surfaces_data(
-                    correlated_surface = cfs_results[[pair_name]],
-                    adaptive_landscape = landscape,
-                    trait_cols = trait_cols
+                formula_str <- paste("Survived ~ s(", traits[1], ", ", traits[2], ")")
+                fitness_model <- mgcv::gam(
+                    as.formula(formula_str),
+                    family = binomial,
+                    data = prepared_bumpus
                 )
 
-                plots <- plot_fitness_surfaces_comparison(
-                    comparison_data = comparison_data,
-                    bins = 10,
-                    title = paste("Comparison:", paste(trait_cols, collapse = " vs "))
+                landscape <- adaptive_landscape(
+                    data = prepared_bumpus,
+                    fitness_model = fitness_model,
+                    trait_cols = traits,
+                    simulation_n = 500,
+                    grid_n = 60
                 )
 
-                # side-by-side plot
-                if (!is.null(plots$side_by_side)) {
-                    ggsave(
-                        file.path(figure_dir, paste0("comparison_", pair_name, "_side_by_side.png")),
-                        plots$side_by_side,
-                        width = 12,
-                        height = 5,
-                        dpi = 300
+                saveRDS(landscape, file.path(model_dir, paste0("adaptive_landscape_", pair_name, ".rds")))
+
+                if (exists("plot_adaptive_landscape")) {
+                    points_data <- prepared_bumpus[, c("Survived", traits)]
+
+                    p2d <- plot_adaptive_landscape(
+                        landscape = landscape,
+                        trait_cols = traits,
+                        original_data = points_data,
+                        bins = 12
                     )
-                }
 
-                # overlay plot
-                if (!is.null(plots$overlay)) {
-                    ggsave(
-                        file.path(figure_dir, paste0("comparison_", pair_name, "_overlay.png")),
-                        plots$overlay,
+                    ggplot2::ggsave(
+                        file.path(figure_dir, paste0("adaptive_landscape_2d_", pair_name, ".png")),
+                        p2d,
                         width = 8,
                         height = 6,
                         dpi = 300
                     )
                 }
 
-                # Calculate correlation between surfaces
-                cor_df <- comparison_data$combined_data
-                individual_fit <- cor_df$fitness[cor_df$type == "Correlated Fitness (Individual)"]
-                population_fit <- cor_df$fitness[cor_df$type == "Adaptive Landscape (Population)"]
+                # 3D plot
+                if (exists("plot_adaptive_landscape_3d")) {
+                    png(
+                        file.path(figure_dir, paste0("adaptive_landscape_3d_", pair_name, ".png")),
+                        width = 8,
+                        height = 6,
+                        units = "in",
+                        res = 300
+                    )
 
-                cor_val <- cor(individual_fit, population_fit, use = "complete.obs")
-                cat("  Correlation:", round(cor_val, 4), "\n")
+                    plot_adaptive_landscape_3d(
+                        landscape = landscape,
+                        trait_cols = traits,
+                        theta = -30,
+                        phi = 30,
+                        grid_n = 200
+                    )
 
-                comparison_results[[pair_name]] <- list(
-                    correlation = cor_val,
-                    comparison_data = comparison_data,
-                    plots = plots
+                    dev.off()
+                }
+
+                # Save summary for this pair
+                summary_df <- data.frame(
+                    Trait1 = traits[1],
+                    Trait2 = traits[2],
+                    Optimal_Trait1 = round(landscape$optimum[[traits[1]]], 3),
+                    Optimal_Trait2 = round(landscape$optimum[[traits[2]]], 3),
+                    Optimal_Fitness = round(landscape$optimum$.mean_fit, 3)
                 )
 
-                write.csv(
-                    data.frame(
-                        trait1 = trait_cols[1],
-                        trait2 = trait_cols[2],
-                        correlation = cor_val,
-                        n_points = length(individual_fit)
-                    ),
-                    file.path(table_dir, paste0("comparison_correlation_", pair_name, ".csv")),
-                    row.names = FALSE
+                # Append to master summary
+                if (!exists("master_summary")) {
+                    master_summary <- summary_df
+                } else {
+                    master_summary <- rbind(master_summary, summary_df)
+                }
+            }
+
+            write.csv(master_summary, file.path(table_dir, "adaptive_landscape_summary_all.csv"), row.names = FALSE)
+
+            # Create 3D plots from multiple angles for each pair
+            if (exists("plot_adaptive_landscape_3d")) {
+                angles <- list(
+                    c(-30, 30), # default
+                    c(0, 30), # front view
+                    c(-60, 20), # side view
+                    c(30, 40), # back-right view
+                    c(-90, 30) # left side view
                 )
-            }
 
-            cat("\n=== Comparison Summary ===\n")
-            summary_df <- data.frame()
-            for (name in names(comparison_results)) {
-                cor_val <- comparison_results[[name]]$correlation
-                cat(name, ": correlation =", round(cor_val, 4), "\n")
-                summary_df <- rbind(summary_df, data.frame(
-                    Trait_Pair = name,
-                    Correlation = round(cor_val, 4)
-                ))
-            }
+                for (traits in trait_combinations) {
+                    pair_name <- paste(traits, collapse = "_")
+                    landscape <- readRDS(file.path(model_dir, paste0("adaptive_landscape_", pair_name, ".rds")))
 
-            write.csv(summary_df, file.path(table_dir, "comparison_summary.csv"), row.names = FALSE)
+                    for (i in seq_along(angles)) {
+                        png(
+                            file.path(figure_dir, paste0("adaptive_landscape_3d_", pair_name, "_angle", i, ".png")),
+                            width = 8,
+                            height = 6,
+                            units = "in",
+                            res = 300
+                        )
+
+                        plot_adaptive_landscape_3d(
+                            landscape = landscape,
+                            trait_cols = traits,
+                            theta = angles[[i]][1],
+                            phi = angles[[i]][2],
+                            grid_n = 200
+                        )
+
+                        dev.off()
+                    }
+                }
+            }
         },
-        error = function(e) {
-            cat("Comparison FAILED:", e$message, "\n")
-        }
+        error = function(e) {}
     )
-} else {
-    cat("\nSkipping surface comparison (required objects not found)\n")
 }
 
 # ------------------------------------------------------
-# 13 Final summary
+# 12 compare_fitness_surfaces
 # ------------------------------------------------------
 
-cat("\n========================================\n")
-cat("TESTING COMPLETE\n")
-cat("========================================\n")
+cat("\nTesting fitness surface comparison...\n")
 
-cat("\nResults saved to:\n")
-cat("  Tables:", table_dir, "\n")
-cat("  Figures:", figure_dir, "\n")
-cat("  Models:", model_dir, "\n")
+if (length(cfs_results) > 0) {
+    tryCatch(
+        {
+            trait_pairs <- names(cfs_results)
+            comparison_results <- list()
 
-# List generated files
-cat("\nGenerated files:\n")
-cat("\nTables:\n")
-print(list.files(table_dir))
+            for (pair_name in trait_pairs) {
+                trait_cols <- cfs_results[[pair_name]]$trait_cols
 
-cat("\nFigures:\n")
-print(list.files(figure_dir))
+                # Load corresponding adaptive landscape
+                landscape_file <- file.path(model_dir, paste0("adaptive_landscape_", pair_name, ".rds"))
 
-cat("\nModels:\n")
-print(list.files(model_dir))
+                if (file.exists(landscape_file)) {
+                    landscape <- readRDS(landscape_file)
 
-cat("\n========================================\n")
+                    comparison_data <- compare_fitness_surfaces_data(
+                        correlated_surface = cfs_results[[pair_name]],
+                        adaptive_landscape = landscape,
+                        trait_cols = trait_cols
+                    )
+
+                    plots <- plot_fitness_surfaces_comparison(
+                        comparison_data = comparison_data,
+                        bins = 10,
+                        title = paste("Comparison:", paste(trait_cols, collapse = " vs "))
+                    )
+
+                    # Save side-by-side plot
+                    if (!is.null(plots$side_by_side)) {
+                        ggplot2::ggsave(
+                            file.path(figure_dir, paste0("comparison_", pair_name, "_side_by_side.png")),
+                            plots$side_by_side,
+                            width = 12,
+                            height = 5,
+                            dpi = 300
+                        )
+                    }
+
+                    # Save overlay plot
+                    if (!is.null(plots$overlay)) {
+                        ggplot2::ggsave(
+                            file.path(figure_dir, paste0("comparison_", pair_name, "_overlay.png")),
+                            plots$overlay,
+                            width = 8,
+                            height = 6,
+                            dpi = 300
+                        )
+                    }
+
+                    # Calculate correlation between surfaces
+                    cor_df <- comparison_data$combined_data
+                    individual_fit <- cor_df$fitness[cor_df$type == "Correlated Fitness (Individual)"]
+                    population_fit <- cor_df$fitness[cor_df$type == "Adaptive Landscape (Population)"]
+
+                    cor_val <- cor(individual_fit, population_fit, use = "complete.obs")
+
+                    comparison_results[[pair_name]] <- list(
+                        correlation = cor_val,
+                        comparison_data = comparison_data
+                    )
+
+                    # Save correlation
+                    write.csv(
+                        data.frame(
+                            trait1 = trait_cols[1],
+                            trait2 = trait_cols[2],
+                            correlation = cor_val,
+                            n_points = length(individual_fit)
+                        ),
+                        file.path(table_dir, paste0("comparison_correlation_", pair_name, ".csv")),
+                        row.names = FALSE
+                    )
+                }
+            }
+
+            # Save master summary
+            if (length(comparison_results) > 0) {
+                summary_df <- do.call(rbind, lapply(names(comparison_results), function(name) {
+                    data.frame(
+                        Trait_Pair = name,
+                        Correlation = round(comparison_results[[name]]$correlation, 4)
+                    )
+                }))
+
+                write.csv(summary_df, file.path(table_dir, "comparison_summary.csv"), row.names = FALSE)
+            }
+        },
+        error = function(e) {
+            cat("FAILED: comparison -", e$message, "\n")
+        }
+    )
+} else {
+    cat("Skipping comparison (required functions or data not found)\n")
+}
