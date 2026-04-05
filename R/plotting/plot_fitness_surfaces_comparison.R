@@ -7,6 +7,20 @@
 # - Adaptive Landscape: population-level (red)
 # ======================================================
 
+#' Plot Fitness Surfaces Comparison
+#'
+#' Visualizes the comparison between individual-level correlated fitness 
+#' and population-level adaptive landscape.
+#'
+#' @param comparison_data Output list from \code{compare_fitness_surfaces_data()}.
+#' @param bins Integer specifying the number of contour bins. Default is 10.
+#' @param title Optional character string for the overarching plot title.
+#' @param point_alpha Numeric value for optimum point transparency. Default is 0.7.
+#' @param linewidth Numeric value for contour line width. Default is 0.8.
+#' @param show_optima Logical indicating whether to show optimum points on the overlay. Default is \code{TRUE}.
+#'
+#' @return A list containing \code{side_by_side} (a \code{patchwork} object) and \code{overlay} (a \code{ggplot} object).
+#' @export
 plot_fitness_surfaces_comparison <- function(
   comparison_data,
   bins = 10,
@@ -36,8 +50,6 @@ plot_fitness_surfaces_comparison <- function(
     cor_df <- combined[combined$type == "Correlated Fitness (Individual)", ]
     ada_df <- combined[combined$type == "Adaptive Landscape (Population)", ]
 
-    n_colors <- max(bins, 20)
-
     # Left plot: Correlated Fitness (Blue)
     p_cor <- ggplot2::ggplot(cor_df, ggplot2::aes(
         x = .data[[trait_cols[1]]],
@@ -46,7 +58,7 @@ plot_fitness_surfaces_comparison <- function(
     )) +
         ggplot2::geom_contour_filled(bins = bins) +
         ggplot2::scale_fill_manual(
-            values = colorRampPalette(c("lightblue", "steelblue", "darkblue", "navy"))(n_colors),
+            values = colorRampPalette(c("lightblue", "steelblue", "darkblue", "navy"))(bins),
             name = "Fitness"
         ) +
         ggplot2::labs(
@@ -76,7 +88,7 @@ plot_fitness_surfaces_comparison <- function(
     )) +
         ggplot2::geom_contour_filled(bins = bins) +
         ggplot2::scale_fill_manual(
-            values = colorRampPalette(c("lightcoral", "coral", "darkred", "brown"))(n_colors),
+            values = colorRampPalette(c("lightcoral", "coral", "darkred", "brown"))(bins),
             name = "Mean Fitness"
         ) +
         ggplot2::labs(

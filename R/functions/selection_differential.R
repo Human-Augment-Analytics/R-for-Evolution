@@ -35,6 +35,25 @@
 #   - If group is specified and return_grouped = FALSE: mean S across groups
 # ============================================================================
 
+#' Calculate selection differential (S)
+#'
+#' Computes the selection differential S = Cov(z, w) for a single trait.
+#'
+#' @param data A data frame containing fitness and trait measurements.
+#' @param fitness_col A string specifying the name of the fitness column.
+#' @param trait_col A string specifying the name of the trait column.
+#' @param standardized Logical indicating whether the trait is already standardized. If \code{FALSE}, it will be standardized.
+#' @param use_relative Logical indicating whether to use relative fitness.
+#' @param group Optional grouping variable string. Calculates S within each group if provided.
+#' @param return_grouped Logical indicating whether to return a data frame with S per group (\code{TRUE}) or overall mean S (\code{FALSE}).
+#'
+#' @return A single numeric value representing overall S, or a data frame with S per group if \code{return_grouped = TRUE}.
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' S <- selection_differential(my_data, "fitness", "trait1")
+#' }
 selection_differential <- function(data,
                                    fitness_col,
                                    trait_col,

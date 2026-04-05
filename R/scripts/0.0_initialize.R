@@ -26,6 +26,9 @@ required_packages <- c(
     "car"
 )
 
+#' Helper function to load or install a package
+#' @param pkg String representing the package name.
+#' @noRd
 load_or_install <- function(pkg) {
     if (!require(pkg, character.only = TRUE)) {
         install.packages(pkg, repos = "https://cloud.r-project.org")

@@ -36,6 +36,27 @@
 #     P_Value            : statistical significance
 #     Variance           : square of standard error
 # ============================================================================
+#' Calculate selection coefficients
+#'
+#' Main wrapper function for selection analysis following Lande & Arnold (1983).
+#' Extracts linear (beta), quadratic (gamma), and correlational selection gradients.
+#'
+#' @param data A data frame containing fitness and trait measurements.
+#' @param fitness_col A string specifying the name of the fitness column.
+#' @param trait_cols A character vector of trait column names.
+#' @param fitness_type A string indicating the fitness type: \code{"auto"}, \code{"binary"}, or \code{"continuous"}.
+#' @param standardize Logical indicating whether to standardize traits to mean 0 and SD 1. Default is \code{TRUE}.
+#' @param group Optional string specifying a grouping variable (e.g., "year", "site").
+#' @param use_relative_for_fit Logical indicating whether to use relative fitness for continuous data. Default is \code{TRUE}.
+#' @param return_grouped Logical indicating whether to return results grouped if a \code{group} is specified.
+#'
+#' @return A data frame containing selection coefficients (Term, Type, Beta_Coefficient, Standard_Error, P_Value, Variance).
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' coefs <- selection_coefficients(my_data, "fitness", c("trait1", "trait2"))
+#' }
 selection_coefficients <- function(data,
                                    fitness_col,
                                    trait_cols,

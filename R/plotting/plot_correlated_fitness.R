@@ -11,7 +11,18 @@
 # - DO NOT standardize again within this function
 # ======================================================
 
-
+#' Plot Correlated Fitness Surface
+#'
+#' @param tps Output list from \code{correlated_fitness_surface()}.
+#' @param trait_cols Character vector of length 2 specifying the trait column names.
+#' @param bins Integer specifying the number of contour bins. Default is 12.
+#' @param point_alpha Numeric value for point transparency. Default is 0.7.
+#' @param show_points Logical indicating whether to show original data points. Default is \code{FALSE}.
+#' @param show_optimum Logical indicating whether to mark the optimum point. Default is \code{TRUE}.
+#' @param ... Additional arguments passed to \code{ggplot2::labs()}.
+#'
+#' @return A \code{ggplot} object representing the correlated fitness surface.
+#' @export
 plot_correlated_fitness <- function(
   tps,
   trait_cols,
@@ -128,6 +139,19 @@ plot_correlated_fitness <- function(
 # Enhanced version with original data points colored by fitness
 # ======================================================
 
+#' Plot Enhanced Correlated Fitness Surface
+#'
+#' @param tps Output list from \code{correlated_fitness_surface()}.
+#' @param trait_cols Character vector of length 2. If \code{NULL}, inferred from grid.
+#' @param original_data Optional data frame of original data.
+#' @param fitness_col Optional character string specifying the fitness column for coloring points.
+#' @param bins Integer specifying the number of contour bins. Default is 12.
+#' @param point_alpha Numeric value for point transparency. Default is 0.7.
+#' @param show_optimum Logical indicating whether to mark the optimum point. Default is \code{TRUE}.
+#' @param ... Additional arguments passed to \code{ggplot2::labs()}.
+#'
+#' @return A \code{ggplot} object with enhanced visualizations.
+#' @export
 plot_correlated_fitness_enhanced <- function(
   tps,
   trait_cols = NULL,

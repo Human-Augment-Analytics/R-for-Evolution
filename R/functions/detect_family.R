@@ -23,6 +23,17 @@
 #     note : additional information about detection
 # ============================================================================
 
+#' Automatically detect fitness type and GLM family
+#'
+#' Heuristically determines whether a fitness vector represents binary, count, proportion, or continuous data.
+#'
+#' @param y A numeric vector representing fitness values.
+#'
+#' @return A list containing \code{type} (string), \code{family} (GLM family object), and \code{note} (string).
+#' @export
+#'
+#' @examples
+#' detect_family(c(0, 1, 0, 0, 1, 1))
 detect_family <- function(y) {
   # Clean data
   y_clean <- y[!is.na(y)]

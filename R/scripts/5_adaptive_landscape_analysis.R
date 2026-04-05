@@ -20,6 +20,21 @@
 # - Individual-level data to estimate within-population variance
 # ======================================================
 
+#' Calculate Adaptive Landscape
+#'
+#' Computes the adaptive landscape (mean fitness as a function of population mean phenotype)
+#' using a fitted individual-level fitness model.
+#'
+#' @param data A data frame containing the original trait and fitness data.
+#' @param fitness_model A fitted model object (e.g., GAM or Tps) predicting individual fitness.
+#' @param trait_cols A character vector of length 2 specifying the trait column names.
+#' @param group_col Optional character string specifying a grouping variable.
+#' @param population_variance Optional covariance matrix for the traits. Estimated from data if \code{NULL}.
+#' @param simulation_n Integer specifying the number of individuals to simulate per grid point. Default is 1000.
+#' @param grid_n Integer specifying the resolution of the population mean grid. Default is 50.
+#' @param custom_range Optional list specifying custom ranges for the traits.
+#' @return An object of class \code{"adaptive_landscape"}.
+#' @export
 adaptive_landscape <- function(
   data,
   fitness_model,
@@ -205,7 +220,11 @@ adaptive_landscape <- function(
 }
 
 
-# Print method for adaptive_landscape objects
+#' Print method for adaptive landscape
+#'
+#' @param x An object of class \code{"adaptive_landscape"}.
+#' @param ... Additional arguments passed to \code{print}.
+#' @export
 print.adaptive_landscape <- function(x, ...) {
     cat("\nAdaptive Landscape Object\n")
     cat("========================\n")

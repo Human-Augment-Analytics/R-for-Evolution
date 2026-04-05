@@ -12,6 +12,22 @@
 # - DO NOT standardize again within this function
 # ======================================================
 
+#' Compare Correlated Fitness Surface vs Adaptive Landscape
+#'
+#' Compares individual-level fitness (correlated surface) to population-level mean fitness (adaptive landscape).
+#'
+#' @param correlated_surface Output list from \code{correlated_fitness_surface()}.
+#' @param adaptive_landscape Output list from adaptive landscape modeling.
+#' @param trait_cols A character vector of length 2 specifying the trait column names.
+#' @param calculate_correlation Logical indicating whether to calculate the correlation between the two surfaces.
+#'
+#' @return A list containing combined grid data, summary stats, optima points, and correlation metrics.
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' comp <- compare_fitness_surfaces_data(corr_surf, adapt_land, c("trait1", "trait2"))
+#' }
 compare_fitness_surfaces_data <- function(
   correlated_surface,
   adaptive_landscape,

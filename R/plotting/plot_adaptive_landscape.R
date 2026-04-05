@@ -11,6 +11,19 @@
 # - DO NOT standardize again within this function
 # ======================================================
 
+#' Plot Adaptive Landscape (2D Contour)
+#'
+#' @param landscape Output object of class \code{"adaptive_landscape"}.
+#' @param trait_cols Character vector of length 2 specifying the trait column names.
+#' @param original_data Optional data frame of original data points. Default is \code{NULL}.
+#' @param group_col Optional character string specifying a grouping variable for labels.
+#' @param bins Integer specifying the number of contour bins. Default is 12.
+#' @param show_optimum Logical indicating whether to display the optimum point. Default is \code{TRUE}.
+#' @param show_actual_means Logical indicating whether to display actual population means. Default is \code{TRUE}.
+#' @param point_alpha Numeric value for point transparency. Default is 0.8.
+#' @param ... Additional arguments passed to \code{ggplot2::labs()}.
+#' @return A \code{ggplot} object representing the adaptive landscape.
+#' @export
 plot_adaptive_landscape <- function(
   landscape,
   trait_cols,
@@ -165,6 +178,18 @@ plot_adaptive_landscape <- function(
 # 3D perspective view of adaptive landscape
 # ======================================================
 
+#' Plot Adaptive Landscape (3D Perspective)
+#'
+#' @param landscape Output object of class \code{"adaptive_landscape"}.
+#' @param trait_cols Character vector of length 2 specifying the trait column names.
+#' @param theta Numeric azimuthal viewing angle. Default is -30.
+#' @param phi Numeric colatitude viewing angle. Default is 30.
+#' @param grid_n Integer specifying the resolution of the interpolation grid. Default is 200.
+#' @param color_palette Optional vector of colors for the surface. Defaults to viridis plasma.
+#' @param ... Additional arguments passed to \code{fields::drape.plot()}.
+#'
+#' @return A 3D plot produced by \code{fields::drape.plot()}.
+#' @export
 plot_adaptive_landscape_3d <- function(
   landscape,
   trait_cols,

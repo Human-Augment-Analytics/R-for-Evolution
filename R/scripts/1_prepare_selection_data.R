@@ -39,6 +39,22 @@
 #     - Potentially dropped NA rows (if na_action = "drop")
 # ============================================================================
 
+#' Prepare data for selection analysis
+#'
+#' Cleans, standardizes, and calculates relative fitness for trait and fitness data.
+#' Standardizations and relative fitness calculations can be performed within groups.
+#'
+#' @param data A data frame containing fitness and trait measurements.
+#' @param fitness_col A string specifying the name of the fitness column.
+#' @param trait_cols A character vector of trait column names.
+#' @param standardize Logical indicating whether to standardize traits to mean 0 and SD 1. Default is \code{TRUE}.
+#' @param group Optional string specifying a grouping variable.
+#' @param add_relative Logical indicating whether to add a relative fitness column. Default is \code{TRUE}.
+#' @param na_action A string specifying how to handle missing values: \code{"warn"}, \code{"drop"}, or \code{"none"}.
+#' @param name_relative A string specifying the name for the relative fitness column. Default is \code{"relative_fitness"}.
+#'
+#' @return A modified data frame ready for selection analysis.
+#' @export
 prepare_selection_data <- function(data,
                                    fitness_col,
                                    trait_cols,

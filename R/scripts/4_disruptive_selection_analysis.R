@@ -1,97 +1,69 @@
 # ============================================================================
 # analyze_disruptive_selection
 #
-# Purpose: Analyze disruptive/stabilizing selection for a single trait
+# Purpose: Detect disruptive or stabilizing selection on a single trait
 #
-# Definition: w ~ z + z²
+# Model: w = α + βz + γz² + ε
 #   where:
-#     β (linear) = directional selection gradient
-#     γ (quadratic) = 2 × β_quad = nonlinear selection gradient
-#     γ > 0 = disruptive selection (U-shaped)
-#     γ < 0 = stabilizing selection (∩-shaped)
+#     β = linear selection gradient (directional selection)
+#     γ = quadratic selection gradient (γ > 0: disruptive; γ < 0: stabilizing)
 #
-# IMPORTANT NOTE:
-#   - OLS is ALWAYS used to estimate coefficients (β and γ)
-#   - For binary fitness: OLS gives coefficients, logistic GLM gives p-values
-#   - For continuous fitness: OLS gives both coefficients and valid p-values
+# IMPORTANT NOTES:
+#   For ALL fitness types, selection gradients (β and γ) come from OLS.
+#   P-values come from:
+#     - Continuous fitness: OLS (t-tests are valid)
+#     - Binary fitness: Logistic GLM (Wald tests)
+#
+#   Quadratic coefficients are multiplied by 2 to obtain γ following
+#   Lande & Arnold (1983): γ_ii = 2 × β_quad
+#
+#   Standardization is done WITHIN each group (e.g., year) to ensure
+#   individuals are compared relative to their relevant context.
 #
 # Parameters:
-#   data               : data frame with fitness and trait measurements
-#   fitness_col        : name of the fitness column
-#   trait_col          : name of the trait column
-#   fitness_type       : "binary" or "continuous"
-#   standardize        : if TRUE, standardize trait to mean 0, SD 1
-#   group              : optional grouping variable (e.g., "lake", "year")
-#   return_grouped     : if TRUE and group is specified, return data frame
-#                        with results per group; if FALSE, return overall result
+#   data         : data frame with fitness and trait measurements
+#   fitness_col  : name of the fitness column
+#   trait_col    : name of the trait column (single trait)
+#   fitness_type : "binary" or "continuous"
+#   standardize  : if TRUE, standardize trait to mean 0, SD 1
+#   group        : optional grouping variable (e.g., "year", "site")
+#                  When specified, standardization and relative fitness are
+#                  calculated separately within each group.
 #
 # Returns:
-#   Data frame with columns:
-#     Term               : trait name or "trait²"
-#     Type               : "Linear" or "Quadratic"
-#     Beta_Coefficient   : β (linear) or γ (quadratic)
-#     Standard_Error     : standard error of estimate
-#     P_Value            : statistical significance
-#     Variance           : square of standard error
-#     Group              : (if return_grouped = TRUE) group identifier
+#   Data frame with:
+#     Term              : trait name and "trait²"
+#     Type              : "Linear" or "Quadratic"
+#     Beta_Coefficient  : selection gradient (β or γ)
+#     Standard_Error    : standard error of estimate
+#     P_Value           : statistical significance (from appropriate source)
+#     Variance          : squared standard error
 # ============================================================================
 
+#' Analyze disruptive/stabilizing selection
+#'
+#' Detects disruptive or stabilizing selection on a single trait by estimating linear and quadratic gradients.
+#'
+#' @param data A data frame containing fitness and trait measurements.
+#' @param fitness_col A string specifying the name of the fitness column.
+#' @param trait_col A string specifying the name of the single trait column.
+#' @param fitness_type A string indicating the fitness type: \code{"binary"} or \code{"continuous"}.
+#' @param standardize Logical indicating whether to standardize the trait to mean 0 and SD 1. Default is \code{TRUE}.
+#' @param group Optional string specifying a grouping variable.
+#'
+#' @return A data frame containing selection coefficients and statistics.
+#' @export
 analyze_disruptive_selection <- function(
   data,
   fitness_col,
   trait_col,
   fitness_type = c("binary", "continuous"),
   standardize = TRUE,
-  group = NULL,
-  return_grouped = FALSE
+  group = NULL
 ) {
   # Input validation
   fitness_type <- match.arg(fitness_type)
 
-  if (!trait_col %in% names(data)) {
-    stop("Trait column '", trait_col, "' not found in data")
-  }
-  if (!fitness_col %in% names(data)) {
-    stop("Fitness column '", fitness_col, "' not found in data")
-  }
-
-  # ======================================================
-  # CASE 1: return by group
-  # ======================================================
-  if (return_grouped && !is.null(group)) {
-    if (!group %in% names(data)) {
-      stop("Group column '", group, "' not found in data")
-    }
-
-    groups <- unique(data[[group]])
-    results_list <- list()
-
-    for (g in groups) {
-      data_g <- data[data[[group]] == g, ]
-
-      res <- analyze_disruptive_selection(
-        data = data_g,
-        fitness_col = fitness_col,
-        trait_col = trait_col,
-        fitness_type = fitness_type,
-        standardize = standardize,
-        group = NULL,
-        return_grouped = FALSE
-      )
-
-      res$Group <- g
-      results_list[[as.character(g)]] <- res
-    }
-
-    all_results <- do.call(rbind, results_list)
-    return(all_results)
-  }
-
-  # ======================================================
-  # CASE 2: main analysis (no grouping)
-  # ======================================================
-
-  # Prepare data (standardization, relative fitness if needed)
   df <- prepare_selection_data(
     data = data,
     fitness_col = fitness_col,
@@ -102,14 +74,11 @@ analyze_disruptive_selection <- function(
     na_action = "warn"
   )
 
-  # Formula: w ~ z + z²
   fml <- as.formula(
     paste(fitness_col, "~", trait_col, "+ I(", trait_col, "^2)")
   )
 
-  # ======================================================
-  # Fit OLS (always for coefficient estimates)
-  # ======================================================
+  # OLS
   fit_ols <- lm(fml, data = df)
   coef_ols <- summary(fit_ols)$coefficients
 
@@ -128,19 +97,21 @@ analyze_disruptive_selection <- function(
     se_quad <- NA_real_
   }
 
-  # ======================================================
-  # Get p-values based on fitness type
-  # ======================================================
+
+  # GET P-VALUES BASED ON FITNESS TYPE
   if (fitness_type == "continuous") {
-    # For continuous fitness: OLS p-values are valid
+    # For continuous fitness:
+    # OLS p-values (t-tests) are valid because residuals approximate normality
     p_linear <- coef_ols[trait_col, "Pr(>|t|)"]
+
     if (quad_term %in% rownames(coef_ols)) {
       p_quad <- coef_ols[quad_term, "Pr(>|t|)"]
     } else {
       p_quad <- NA_real_
     }
   } else {
-    # For binary fitness: OLS p-values are NOT valid
+    # For binary fitness (0/1 survival):
+    # OLS p-values are NOT valid (residuals violate normality)
     # Use logistic GLM for valid p-values
     fit_glm <- glm(fml, data = df, family = binomial)
     coef_glm <- summary(fit_glm)$coefficients
@@ -154,9 +125,6 @@ analyze_disruptive_selection <- function(
     }
   }
 
-  # ======================================================
-  # Create results data frame
-  # ======================================================
   results <- data.frame(
     Term = c(trait_col, paste0(trait_col, "²")),
     Type = c("Linear", "Quadratic"),

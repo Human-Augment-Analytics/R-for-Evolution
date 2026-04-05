@@ -4,6 +4,21 @@
 # ======================================================
 
 
+#' Plot Univariate Correlated Fitness Function
+#'
+#' Visualizes the univariate fitness function estimated via spline.
+#'
+#' @param uni Output object of class \code{"univariate_fitness"} from \code{univariate_spline()}.
+#' @param trait_col Character string specifying the trait column name.
+#' @param title Optional character string for the plot title.
+#' @param show_points Logical indicating whether to show the original data points. Default is \code{TRUE}.
+#' @param point_alpha Numeric value for point transparency. Default is 0.25.
+#' @param ribbon_fill Color for the confidence interval ribbon. Default is \code{NA} (transparent).
+#' @param ribbon_linetype Linetype for the confidence interval bounds. Default is \code{"dashed"}.
+#' @param ... Additional arguments passed to \code{ggplot2::labs()}.
+#'
+#' @return A \code{ggplot} object representing the univariate fitness function.
+#' @export
 plot_univariate_fitness <- function(uni,
                                     trait_col,
                                     title = NULL,

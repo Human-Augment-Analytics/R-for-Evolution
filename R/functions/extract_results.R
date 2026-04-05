@@ -3,12 +3,14 @@
 # Extract selection coefficients from model results
 # ============================================================================
 
+#' @noRd
 # internal utility: get coefficient-level p-value column name from summary()
 .p_col_from_summary <- function(coef_mat) {
   pcols <- intersect(colnames(coef_mat), c("Pr(>|t|)", "Pr(>|z|)"))
   if (length(pcols)) pcols[1] else NA_character_
 }
 
+#' @noRd
 # internal utility: safely extract ANOVA p-value (car::Anova)
 .ano_p <- function(anova_obj, term) {
   if (is.null(anova_obj)) {
@@ -24,6 +26,7 @@
   }
   as.numeric(anova_obj[term, pcols[1]])
 }
+#' @noRd
 # Helper to get appropriate summary and p-value column
 .get_summary_and_pcol <- function(results) {
   if (results$fitness_type == "binary") {
@@ -89,7 +92,13 @@
   }
 }
 
-# extract Linear Coefficients
+#' Extract linear selection coefficients
+#'
+#' @param trait_cols A character vector of trait column names.
+#' @param results A model results object returned by \code{analyze_linear_selection()}.
+#'
+#' @return A data frame with linear selection coefficients and statistics.
+#' @export
 extract_linear_coefficients <- function(trait_cols, results) {
   obj <- .get_summary_and_pcol(results)
 
@@ -166,7 +175,13 @@ extract_linear_coefficients <- function(trait_cols, results) {
   }
 }
 
-# extract Quadratic Coefficients
+#' Extract quadratic selection coefficients
+#'
+#' @param trait_cols A character vector of trait column names.
+#' @param results A model results object returned by \code{analyze_nonlinear_selection()}.
+#'
+#' @return A data frame with quadratic selection coefficients (doubled estimates) and statistics.
+#' @export
 extract_quadratic_coefficients <- function(trait_cols, results) {
   obj <- .get_summary_and_pcol(results)
 
@@ -258,7 +273,13 @@ extract_quadratic_coefficients <- function(trait_cols, results) {
 }
 
 
-# extract Correlational Coefficients
+#' Extract correlational selection coefficients
+#'
+#' @param trait_cols A character vector of trait column names.
+#' @param results A model results object returned by \code{analyze_nonlinear_selection()}.
+#'
+#' @return A data frame with correlational (interaction) selection coefficients and statistics.
+#' @export
 extract_interaction_coefficients <- function(trait_cols, results) {
   if (length(trait_cols) < 2) {
     return(data.frame(

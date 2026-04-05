@@ -8,13 +8,32 @@
 # IMPORTANT NOTES: Traits MUST be standardized BEFORE calling this function
 # Use prepare_selection_data() with standardize = TRUE and optional group
 # DO NOT use scale_traits = TRUE (double standardization)
-#
-# When group is specified, the function automatically runs separate
-#      analyses for each group and returns a list of results.
 # ======================================================
 
+#' @noRd
 `%||%` <- function(a, b) if (!is.null(a)) a else b
 
+#' Calculate the Correlated Fitness Surface
+#'
+#' Fits a model for individual fitness based on multiple individual phenotypes (w ~ z1 + z2 + interactions).
+#' Traits MUST be standardized BEFORE calling this function.
+#'
+#' @param data A data frame containing fitness and trait measurements.
+#' @param fitness_col A string specifying the name of the fitness column.
+#' @param trait_cols A character vector of exactly length 2 specifying the trait column names.
+#' @param grid_n Integer specifying the resolution of the prediction grid. Default is 60.
+#' @param method A string specifying the modeling method: \code{"auto"}, \code{"gam"}, or \code{"tps"}.
+#' @param scale_traits Deprecated. Logical. Set to \code{FALSE} to avoid double standardization.
+#' @param group Optional string specifying a grouping variable.
+#' @param k Integer specifying the basis dimension for the GAM smooth term.
+#'
+#' @return A list containing the fitted model, grid predictions, and metadata.
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' surf <- correlated_fitness_surface(my_data, "fitness", c("trait1", "trait2"))
+#' }
 correlated_fitness_surface <- function(
   data,
   fitness_col,
@@ -36,44 +55,6 @@ correlated_fitness_surface <- function(
   if (!is.null(group) && !group %in% names(data)) {
     stop("Group column '", group, "' not found in data")
   }
-
-  # ======================================================
-  # If group is specified, run separate analyses for each group
-  # ======================================================
-  if (!is.null(group)) {
-    groups <- unique(data[[group]])
-    results_list <- list()
-
-    for (g in groups) {
-      data_g <- data[data[[group]] == g, ]
-
-      # Recursively call without group
-      res <- correlated_fitness_surface(
-        data = data_g,
-        fitness_col = fitness_col,
-        trait_cols = trait_cols,
-        grid_n = grid_n,
-        method = method,
-        scale_traits = scale_traits,
-        group = NULL, # No further grouping
-        k = k
-      )
-
-      # Add group identifier
-      res$group_value <- g
-      results_list[[as.character(g)]] <- res
-    }
-
-    # Return list of results with group info
-    attr(results_list, "grouped") <- TRUE
-    attr(results_list, "groups") <- groups
-    attr(results_list, "group_col") <- group
-    return(results_list)
-  }
-
-  # ======================================================
-  # Main analysis (no grouping)
-  # ======================================================
 
   # DOUBLE STANDARDIZATION WARNING
   if (scale_traits) {
@@ -115,6 +96,12 @@ correlated_fitness_surface <- function(
   x1 <- x1[keep]
   x2 <- x2[keep]
 
+  if (!is.null(group)) {
+    grp <- data[[group]][keep]
+  } else {
+    grp <- NULL
+  }
+
   if (length(y) < 10) stop("Too few complete cases: ", length(y), " (<10)")
 
   # Detect binary fitness
@@ -139,16 +126,23 @@ correlated_fitness_surface <- function(
   cat("Data type:", ifelse(is_binary, "binary", "continuous"), "\n")
   cat("Selected method:", method, "\n")
   cat("Data points:", length(y), "\n")
+  if (!is.null(group)) {
+    cat("Grouping variable:", group, "\n")
+    cat("Number of groups:", length(unique(grp)), "\n")
+  }
 
   x1s <- x1
   x2s <- x2
 
-  # For prediction grid
+  # For prediction grid (in original units, not standardized)
+  # But since traits are standardized, original = standardized
   g1 <- seq(min(x1, na.rm = TRUE), max(x1, na.rm = TRUE), length.out = grid_n)
   g2 <- seq(min(x2, na.rm = TRUE), max(x2, na.rm = TRUE), length.out = grid_n)
 
   grid <- expand.grid(g1, g2, KEEP.OUT.ATTRS = FALSE)
   names(grid) <- trait_cols
+
+  # Grid is already in standardized units
   grid_scaled <- grid
 
   if (method == "gam") {
@@ -165,24 +159,43 @@ correlated_fitness_surface <- function(
       trait2 = as.numeric(x2s)
     )
     names(df_fit)[2:3] <- trait_cols
+
+    if (!is.null(group)) {
+      df_fit[[group]] <- grp
+    }
+
     df_fit <- df_fit[complete.cases(df_fit), ]
 
     cat("GAM fitting with", nrow(df_fit), "observations\n")
 
-    # Build formulas (no group because we're in main analysis)
+    # Build formulas
     k_adj <- min(k, nrow(df_fit) - 1)
 
-    fml <- as.formula(paste(
-      ".y ~ s(", trait_cols[1], ", ", trait_cols[2],
-      ", bs = 'tp', k = ", k_adj, ")"
-    ))
-    fml_alt1 <- as.formula(paste(
-      ".y ~ s(", trait_cols[1],
-      ", k = min(floor(", k_adj, "/2), nrow(df_fit) - 1)) + s(",
-      trait_cols[2],
-      ", k = min(floor(", k_adj, "/2), nrow(df_fit) - 1))"
-    ))
-    fml_alt2 <- as.formula(paste(".y ~ ", trait_cols[1], " + ", trait_cols[2]))
+    if (!is.null(group)) {
+      fml <- as.formula(paste(
+        ".y ~ ", group, " + s(", trait_cols[1], ", ", trait_cols[2],
+        ", bs = 'tp', k = ", k_adj, ")"
+      ))
+      fml_alt1 <- as.formula(paste(
+        ".y ~ ", group, " + s(", trait_cols[1],
+        ", k = min(floor(", k_adj, "/2), nrow(df_fit) - 1)) + s(",
+        trait_cols[2],
+        ", k = min(floor(", k_adj, "/2), nrow(df_fit) - 1))"
+      ))
+      fml_alt2 <- as.formula(paste(".y ~ ", group, " + ", trait_cols[1], " + ", trait_cols[2]))
+    } else {
+      fml <- as.formula(paste(
+        ".y ~ s(", trait_cols[1], ", ", trait_cols[2],
+        ", bs = 'tp', k = ", k_adj, ")"
+      ))
+      fml_alt1 <- as.formula(paste(
+        ".y ~ s(", trait_cols[1],
+        ", k = min(floor(", k_adj, "/2), nrow(df_fit) - 1)) + s(",
+        trait_cols[2],
+        ", k = min(floor(", k_adj, "/2), nrow(df_fit) - 1))"
+      ))
+      fml_alt2 <- as.formula(paste(".y ~ ", trait_cols[1], " + ", trait_cols[2]))
+    }
 
     try_formulas <- list(
       main = fml,
@@ -222,6 +235,17 @@ correlated_fitness_surface <- function(
     newdat <- grid_scaled[, trait_cols, drop = FALSE]
     names(newdat) <- trait_cols
 
+    if (!is.null(group)) {
+      group_levels <- unique(grp)
+      if (is.factor(df_fit[[group]])) {
+        ref_group <- names(sort(table(df_fit[[group]]), decreasing = TRUE))[1]
+      } else {
+        ref_group <- group_levels[which.min(abs(group_levels - median(group_levels)))]
+      }
+      newdat[[group]] <- ref_group
+      cat("Predictions use group = '", ref_group, "' as reference\n")
+    }
+
     .fit <- tryCatch(
       {
         as.numeric(stats::predict(fit, newdata = newdat, type = "response"))
@@ -249,13 +273,12 @@ correlated_fitness_surface <- function(
       data_type = ifelse(is_binary, "binary", "continuous"),
       trait_cols = trait_cols,
       fitness_col = fitness_col,
-      group_used = NULL,
+      group_used = group,
       surface_type = "correlated_fitness",
       note = "Correlated fitness surface (individual fitness)"
     ))
   }
 
-  # TPS method for continuous data
   if (!requireNamespace("fields", quietly = TRUE)) {
     stop("For continuous fitness with tps method, install fields: install.packages('fields')")
   }
@@ -294,7 +317,7 @@ correlated_fitness_surface <- function(
     data_type = ifelse(is_binary, "binary", "continuous"),
     trait_cols = trait_cols,
     fitness_col = fitness_col,
-    group_used = NULL,
+    group_used = group,
     surface_type = "correlated_fitness",
     note = "Correlated fitness surface (individual fitness)"
   ))

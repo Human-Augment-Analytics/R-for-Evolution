@@ -28,9 +28,21 @@
 #
 # Returns:
 #   For continuous: list with model_ols, summary_ols, anova, vif, fitness_type
-#   For binary: list with model_ols, model_glm, summary_ols, summary_glm, anova (from GLM), vif, fitness_type
+#   For binary: list with model_ols, model_glm, summary_ols, summary_glm,
+#               anova (from GLM), vif, fitness_type
 # ============================================================================
 
+#' Analyze nonlinear selection gradients (gamma)
+#'
+#' Estimates quadratic and correlational selection gradients using OLS.
+#'
+#' @param data A data frame containing fitness and trait measurements.
+#' @param fitness_col A string specifying the name of the fitness column.
+#' @param trait_cols A character vector of trait column names.
+#' @param fitness_type A string indicating the fitness type: \code{"binary"} or \code{"continuous"}.
+#'
+#' @return A list containing the fitted nonlinear models, summaries, ANOVA tables, and VIFs.
+#' @export
 analyze_nonlinear_selection <- function(data, fitness_col, trait_cols, fitness_type) {
   if (length(trait_cols) < 2) {
     stop("Nonlinear selection requires at least 2 traits")

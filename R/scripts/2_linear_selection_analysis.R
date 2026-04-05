@@ -15,14 +15,14 @@
 #
 # Workflow:
 #   Continuous fitness:
-#     1. Fit OLS model -> coefficients = selection gradients (β)
+#     1. Fit OLS model → coefficients = selection gradients (β)
 #     2. p-values come directly from OLS summary
 #     3. Type III ANOVA (car::Anova) for significance of each term
 #     4. Check VIF for multicollinearity
 #
 #   Binary fitness:
-#     1. Fit OLS model -> coefficients = selection gradients (β)
-#     2. Fit logistic GLM model -> p-values from Wald tests (Type III)
+#     1. Fit OLS model → coefficients = selection gradients (β)
+#     2. Fit logistic GLM model → p-values from Wald tests (Type III)
 #     3. Check convergence and separation
 #     4. Type III ANOVA on GLM for overall term significance
 #     5. Check VIF using OLS (GLM VIF not directly comparable)
@@ -33,6 +33,17 @@
 #               anova (from GLM), vif, fitness_type
 # ============================================================================
 
+#' Analyze linear selection gradients (beta)
+#'
+#' Estimates linear selection gradients using OLS, and logistic regression for valid p-values when fitness is binary.
+#'
+#' @param data A data frame containing fitness and trait measurements.
+#' @param fitness_col A string specifying the name of the fitness column.
+#' @param trait_cols A character vector of trait column names.
+#' @param fitness_type A string indicating the fitness type: \code{"binary"} or \code{"continuous"}.
+#'
+#' @return A list containing the fitted models, summaries, ANOVA tables, and VIFs.
+#' @export
 analyze_linear_selection <- function(data, fitness_col, trait_cols, fitness_type) {
   # Check sample size
   if (nrow(data) < 10) {
