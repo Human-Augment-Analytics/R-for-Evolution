@@ -1,0 +1,4 @@
+Analysis Date: 2026-03-21 15:57:58.057275
+Families analyzed: 66
+Traits analyzed: SLA, deltaC13, FDsnow, height
+Significant gradients: 5
