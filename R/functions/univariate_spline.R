@@ -15,6 +15,8 @@
 #   - Use prepare_selection_data() with standardize = TRUE and optional group
 #   - The GAM smooth term estimates the shape of the fitness function
 #   - DO NOT use scale() within this function (double standardization)
+#   - k = NULL (default) triggers adaptive k selection based on n_unique
+#   - k can be overridden by the user for manual control
 # ======================================================
 
 univariate_spline <- function(data,
@@ -22,7 +24,7 @@ univariate_spline <- function(data,
                               trait_col,
                               fitness_type = c("binary", "continuous"),
                               group = NULL,
-                              k = 10) {
+                              k = NULL) {
   fitness_type <- match.arg(fitness_type)
 
   # Input validation
@@ -34,6 +36,15 @@ univariate_spline <- function(data,
   }
   if (!is.numeric(data[[trait_col]])) {
     stop("`trait_col` must be numeric (standardize upstream if needed).")
+  }
+
+  # ======================================================
+  # Adaptive k selection (before group splitting) based on full dataset unique values
+  # ======================================================
+  if (is.null(k)) {
+    n_unique_all <- length(unique(data[[trait_col]][complete.cases(data[[trait_col]])]))
+    k <- min(10, max(5, n_unique_all - 1))
+    message("Adaptive k selected: k = ", k, " (n_unique = ", n_unique_all, ")")
   }
 
   # ======================================================
@@ -50,14 +61,14 @@ univariate_spline <- function(data,
     for (g in groups) {
       data_g <- data[data[[group]] == g, ]
 
-      # Recursively call without group
+      # Recursively call without group, passing resolved k
       res <- univariate_spline(
-        data = data_g,
-        fitness_col = fitness_col,
-        trait_col = trait_col,
+        data         = data_g,
+        fitness_col  = fitness_col,
+        trait_col    = trait_col,
         fitness_type = fitness_type,
-        group = NULL,
-        k = k
+        group        = NULL,
+        k            = k # k is now a number, not NULL
       )
 
       # Add group identifier
@@ -123,15 +134,17 @@ univariate_spline <- function(data,
   df <- data
   df[[".y"]] <- y
 
-  # Adjust k based on unique values
+  # ======================================================
+  # Safety check: cap k at subset-level unique values
+  # ======================================================
   n_unique <- length(unique(df[[trait_col]][complete.cases(df[[trait_col]])]))
   n_obs <- sum(complete.cases(df[[trait_col]], y))
 
-  k_adj <- min(k, max(3, n_unique - 1))
+  k_adj <- min(k, max(5, n_unique - 1))
   if (k_adj < k) {
     warning(
       "Reducing k from ", k, " to ", k_adj,
-      " (only ", n_unique, " unique values)"
+      " (only ", n_unique, " unique values in this subset)"
     )
     k <- k_adj
   }
@@ -143,16 +156,16 @@ univariate_spline <- function(data,
     )
   }
 
-  # Create formula with smooth term (no group here)
+  # Create formula with smooth term
   fml <- stats::as.formula(paste0(".y ~ s(", trait_col, ", k = ", k, ")"))
 
   # Fit GAM
   fit <- tryCatch(
     {
       mgcv::gam(fml,
-        data = df,
-        family = fam,
-        method = "REML",
+        data      = df,
+        family    = fam,
+        method    = "REML",
         na.action = stats::na.omit
       )
     },
@@ -174,7 +187,7 @@ univariate_spline <- function(data,
   grid <- data.frame(seq(rng[1], rng[2], length.out = 200))
   names(grid) <- trait_col
 
-  # Predict
+  # Predict on response scale with 95% CI
   pr <- stats::predict(fit, newdata = grid, se.fit = TRUE, type = "link")
   linkinv <- fit$family$linkinv
 
@@ -188,19 +201,19 @@ univariate_spline <- function(data,
   }
 
   result <- list(
-    model = fit,
-    grid = grid,
-    trait = trait_col,
+    model        = fit,
+    grid         = grid,
+    trait        = trait_col,
     fitness_type = fitness_type,
-    family = family_name,
-    k = k,
-    n_obs = n_obs,
-    fit_note = fit_note,
-    group_used = NULL,
-    trait_mean = z_mean,
-    trait_sd = z_sd,
+    family       = family_name,
+    k            = k,
+    n_obs        = n_obs,
+    fit_note     = fit_note,
+    group_used   = NULL,
+    trait_mean   = z_mean,
+    trait_sd     = z_sd,
     surface_type = "correlated_fitness_univariate",
-    note = "Univariate correlated fitness function (individual fitness)"
+    note         = "Univariate correlated fitness function (individual fitness)"
   )
 
   class(result) <- "univariate_fitness"

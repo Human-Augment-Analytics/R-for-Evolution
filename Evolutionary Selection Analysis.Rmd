@@ -2,19 +2,20 @@
 
 ## 1. Overview
 
-This project implements a comprehensive quantitative genetic framework for analyzing natural selection on phenotypic traits. The framework follows the Lande & Arnold (1983) approach while extending it with modern nonparametric methods for visualizing adaptive landscapes.
+This project implements a comprehensive quantitative genetic framework for analyzing natural selection on phenotypic traits. The framework follows the Lande & Arnold (1983) approach while extending it with modern nonparametric methods for visualizing fitness surfaces and adaptive landscapes.
 
 **Key capabilities:**
 
 | Analysis Type | Description |
 |---------------|-------------|
-| Selection differentials ($\mathbf{S}$) | Total selection acting on traits |
-| Linear selection gradients ($\boldsymbol{\beta}$) | Direct directional selection |
-| Nonlinear selection gradients ($\boldsymbol{\gamma}$) | Stabilizing/disruptive and correlational selection |
-| Univariate correlated fitness functions | Flexible spline-based fitness functions at the individual level |
-| Bivariate correlated fitness surfaces | Thin-plate spline (TPS) or GAM surfaces of individual fitness as a function of two traits |
-| Adaptive landscapes | Mean fitness as a function of population mean phenotype (requires simulation) |
-| Binary fitness handling | Logistic regression for survival/reproduction data |
+| Selection differentials ($\mathbf{S}$) | Total selection acting on traits, including indirect effects through correlated traits |
+| Linear selection gradients ($\boldsymbol{\beta}$) | Direct directional selection on each trait, controlling for correlations with other traits |
+| Nonlinear selection gradients ($\boldsymbol{\gamma}$) | Stabilizing/disruptive ($\gamma_{ii}$) and correlational ($\gamma_{ij}$) selection |
+| Univariate correlated fitness functions | GAM spline-based fitness functions relating individual fitness to a single trait |
+| Bivariate correlated fitness surfaces | GAM or thin-plate spline (TPS) surfaces relating individual fitness to two traits simultaneously |
+| Adaptive landscapes | Population mean fitness as a function of population mean phenotype, estimated via simulation |
+| Binary fitness handling | OLS for gradient estimation; logistic regression (GLM) for valid p-values |
+| Group-level analyses | Stratified standardization and selection estimation within groups (e.g., year, site, population) |
 
 ---
 
@@ -22,7 +23,8 @@ This project implements a comprehensive quantitative genetic framework for analy
 
 ### 2.1 Relative Fitness
 
-Individual fitness is converted to relative fitness to enable comparisons across populations and generations:
+Individual fitness is converted to relative fitness to enable comparisons 
+across populations and generations:
 
 $$w_i = \frac{W_i}{\bar{W}}$$
 
@@ -31,8 +33,15 @@ where:
 - $\bar{W} = \frac{1}{n}\sum_{i=1}^n W_i$ = mean population fitness
 - $w_i$ = relative fitness of individual $i$
 
-**Why relative fitness?** Selection operates on relative, not absolute, differences in fitness. This standardization ensures that selection gradients are comparable across studies.
-**File:** `prepare_selection_data.R`
+**Why relative fitness?** Selection operates on relative, not absolute, 
+differences in fitness. This standardization ensures that selection gradients 
+are comparable across studies.
+
+**Group-level note:** When a grouping variable is specified (e.g., year, site), 
+relative fitness is calculated separately within each group, so that individuals 
+are compared only to others in the same context.
+
+**File:** `1_prepare_selection_data.R`
 
 ### 2.2 Trait Standardization
 
@@ -47,7 +56,7 @@ where:
 - $z_i$ = standardized trait value
 
 **Purpose:** Standardization puts all traits on the same scale, allowing direct comparison of selection gradients. A $\beta = 0.5$ means that a one-standard-deviation increase in the trait increases relative fitness by 0.5 units.
-**File:** `prepare_selection_data.R`
+**File:** `1_prepare_selection_data.R`
 
 ### 2.3 Selection Differential
 
@@ -55,11 +64,12 @@ The selection differential ($S$) measures the total selection acting on a trait,
 
 $$S = \text{Cov}(z, w) = \mathbb{E}[(z - \bar{z})(w - \bar{w})]$$
 
-For multiple traits, the vector of selection differentials is:
+When traits are standardized ($\bar{z} = 0$) and fitness is relativized ($\bar{w} = 1$), this simplifies to $$S = \frac{1}{n}\sum_{i=1}^n z_i w_i$$, which is the form used in this implementation.
 
+For multiple traits, the vector of selection differentials is:
 $$\mathbf{S} = \text{Cov}(\mathbf{z}, w) = \begin{bmatrix} \text{Cov}(z_1, w) \\ \text{Cov}(z_2, w) \\ \vdots \\ \text{Cov}(z_m, w) \end{bmatrix}$$
 
-**Interpretation:** $S$ represents the shift in trait mean after one generation of selection. A positive $S$ indicates the trait mean increases.
+**Interpretation:** $S$ represents the shift in trait mean after one generation of selection. A positive $S$ indicates the trait mean increases after selection.
 **File:** `selection_differential.R`
 
 ### 2.4 Linear Selection Gradients
@@ -103,27 +113,28 @@ $$w = \alpha + \beta_1 z_1 + \beta_2 z_2 + \frac{1}{2}\gamma_{11} z_1^2 + \frac{
 | $\gamma_{ij} < 0$ | Negative correlational | Selection favors negative correlation between traits |
 **File:** `analyze_nonlinear_selection.R`, `analyze_disruptive_selection.R`
 
-### 2.6 Nonparametric Adaptive Landscapes
+### 2.6 Nonparametric Fitness Functions and Surfaces
 
-Traditional quadratic models impose a fixed shape on the fitness function. Nonparametric methods allow the data to reveal unexpected patterns.
+Traditional quadratic models impose a fixed shape on the fitness function. Nonparametric methods allow the data to reveal unexpected patterns without assuming a particular functional form.
 
-**Univariate spline model:**
+**Univariate fitness function (individual level):**
 
 $$w = \alpha + s(z) + \varepsilon$$
 
-where $s(z)$ is a smooth function estimated from the data using penalized regression splines.
+where $s(z)$ is a smooth function estimated using penalized regression splines (GAM with REML smoothing parameter selection).
 
-**Multivariate thin-plate spline:**
+**Bivariate correlated fitness surface (individual level):**
 
 $$w = \alpha + f(z_1, z_2) + \varepsilon$$
 
-where $f(z_1, z_2)$ is a two-dimensional smooth surface. This creates a visual "adaptive landscape" showing how fitness varies across trait combinations.
+where $f(z_1, z_2)$ is a two-dimensional smooth surface estimated via:
+- **GAM** (tensor product smooth): used for binary fitness
+- **Thin-plate spline (TPS)**: used for continuous fitness
 
 **GAM formulation:**
-$$
-w \sim \text{family}(\eta), \quad
-\eta = \alpha + s(z_1, z_2)
-$$
+$$w \sim \text{family}(\eta), \quad \eta = \alpha + s(z_1, z_2)$$
+
+Note: These surfaces describe **individual-level** fitness as a function of individual phenotype, they are correlated fitness surfaces, not adaptive landscapes. See Section 2.7 for the population-level adaptive landscape.
 
 **File:** `correlated_fitness_surface.R`
 
@@ -207,164 +218,24 @@ This comparison highlights the difference between:
 ### 3.1 Core Scripts and Their Roles
 
 | Script | Purpose | Key Functions | Mathematical Component |
-|--------|--------|--------------|------------------------|
-| `prepare_selection_data.R` | Data preprocessing | Standardization, relative fitness, NA handling | $z_i = \frac{x_i - \bar{x}}{s_x}$, $w_i = \frac{W_i}{\bar{W}}$ |
-| `detect_family.R` | Fitness type detection | Binary vs continuous | $W_i \in \{0,1\}$ vs $W_i \in \mathbb{R}^+$ |
-| `selection_differential.R` | Selection differential | $S = \text{Cov}(z, w)$ | $S = \mathbb{E}[(z - \bar{z})(w - \bar{w})]$ |
-| `selection_coefficients.R` | Main wrapper | Complete analysis | Gradient estimation |
-| `analyze_linear_selection.R` | Linear gradients | Regression | $w = \alpha + \boldsymbol{\beta}^T \mathbf{z} + \varepsilon$ |
-| `analyze_nonlinear_selection.R` | Quadratic gradients | $z^2$ + interactions | $w = \alpha + \boldsymbol{\beta}^T\mathbf{z} + \frac{1}{2}\mathbf{z}^T\boldsymbol{\gamma}\mathbf{z} + \varepsilon$ |
-| `analyze_disruptive_selection.R` | Single-trait quadratic | Stabilizing/disruptive test | $\gamma_{ii} = 2\beta_{ii}$ |
-| `extract_results.R` | Result extraction | Coefficient parsing | $\beta$, $\gamma$ |
-| `univariate_spline.R` | 1D fitness | GAM spline | $w = \alpha + s(z) + \varepsilon$ |
-| `correlated_fitness_surface.R` | 2D fitness | GAM / TPS | $w = \alpha + f(z_1, z_2) + \varepsilon$ |
-| `adaptive_landscape.R` | Adaptive landscape | Simulation | $\bar{W} = g(\bar{z}_1, \bar{z}_2)$ |
-| `compare_fitness_surfaces.R` | Comparison | Surface contrast | Individual vs population |
-| `plot_correlated_fitness.R` | Visualization | Contour plots | 2D fitness |
-| `plot_univariate_fitness.R` | Visualization | Line + CI | $w \pm 1.96 \times \text{SE}$ |
-| `plot_adaptive_landscape.R` | Visualization | Population surface | $\bar{W}(\bar{z})$ |
+|--------|---------|--------------|------------------------|
+| `1_prepare_selection_data.R` | Data preprocessing | Standardization, relative fitness, NA handling, group support | $z_i = \frac{x_i - \bar{x}}{s_x}$, $w_i = \frac{W_i}{\bar{W}}$ |
+| `detect_family.R` | Fitness type detection | Binary, count, proportion, or continuous | $W_i \in \{0,1\}$ vs $W_i \in \mathbb{Z}^+$ vs $W_i \in \mathbb{R}^+$ |
+| `selection_differential.R` | Selection differential | $S = \text{Cov}(z, w)$, group-level support | $S = \frac{1}{n}\sum_i z_i w_i$ (when $\bar{z}=0$) |
+| `selection_coefficients.R` | Main wrapper | Integrates linear, nonlinear, and extraction steps | $\boldsymbol{\beta}$, $\boldsymbol{\gamma}$, $\gamma_{ij}$ |
+| `2_linear_selection_analysis.R` | Linear gradients | OLS for $\beta$; GLM for p-values (binary) | $w = \alpha + \boldsymbol{\beta}^T \mathbf{z} + \varepsilon$ |
+| `3_nonlinear_selection_analysis.R` | Quadratic and correlational gradients | OLS for $\gamma$; GLM for p-values (binary); VIF check | $w = \alpha + \boldsymbol{\beta}^T\mathbf{z} + \frac{1}{2}\mathbf{z}^T\boldsymbol{\gamma}\mathbf{z} + \varepsilon$ |
+| `4_disruptive_selection_analysis.R` | Single-trait nonlinear selection | Stabilizing/disruptive test; group support | $\gamma_{ii} = 2\hat{\beta}_{ii}$, $\text{SE}(\gamma_{ii}) = 2\,\text{SE}(\hat{\beta}_{ii})$ |
+| `extract_results.R` | Coefficient extraction | Parses OLS and GLM outputs; handles binary/continuous | $\beta$, $\gamma_{ii}$, $\gamma_{ij}$ |
+| `univariate_spline.R` | 1D correlated fitness function | GAM with REML; group support | $w = \alpha + s(z) + \varepsilon$ |
+| `correlated_fitness_surface.R` | 2D correlated fitness surface | GAM (binary) or TPS (continuous); group support | $w = \alpha + f(z_1, z_2) + \varepsilon$ |
+| `5_adaptive_landscape_analysis.R` | Adaptive landscape | Simulation via `mvrnorm`; positive-definite correction | $\bar{W}(\bar{\mathbf{z}}) = \frac{1}{N}\sum_j \hat{w}_j$, $\mathbf{z}_j \sim \mathcal{N}(\bar{\mathbf{z}}, \mathbf{P})$ |
+| `compare_fitness_surfaces.R` | Surface comparison | Optimum distance; surface correlation via `akima` | $d = \|\mathbf{z}^* - \bar{\mathbf{z}}^*\|$, $r = \text{Cor}(\hat{f}, \bar{W})$ |
+| `plot_correlated_fitness.R` | 2D fitness visualisation | Contour plots; enhanced version with original data overlay | $w = f(z_1, z_2)$ |
+| `plot_univariate_fitness.R` | 1D fitness visualisation | Line plot with 95% CI bands | $\hat{w} \pm 1.96 \times \text{SE}$ |
+| `plot_adaptive_landscape.R` | Adaptive landscape visualisation | 2D contour and 3D perspective view | $\bar{W}(\bar{\mathbf{z}})$ |
+| `plot_fitness_surfaces_comparison.R` | Comparison visualisation | Side-by-side and overlay plots | Individual vs population optima |
 
-### 3.2 Function Dependencies
-
-```{r, message=FALSE}
-library(DiagrammeR)
-
-grViz("
-digraph workflow {
-
-  graph [layout = dot, rankdir = TB, fontname = 'Helvetica', fontsize = 10]
-  node [fontname = 'Helvetica', fontsize = 9]
-  edge [fontname = 'Helvetica', fontsize = 8]
-
-  # =====================
-  # DATA PREPARATION
-  # =====================
-  subgraph cluster_data {
-    label = 'DATA PREPARATION'
-    style = filled
-    fillcolor = '#E8F4FD'
-    color = '#2C7FB8'
-
-    prep [label = 'prepare_selection_data.R\n- z = (x - μ)/σ\n- w = W / W̄\n- NA handling', fillcolor = '#D9EAF7', shape = box]
-    detect [label = 'detect_family.R\n- Binary vs continuous\n- 0/1 detection', fillcolor = '#D9EAF7', shape = box]
-
-    prep -> detect [label = 'prepared data', color = '#2C7FB8']
-  }
-
-  # =====================
-  # SELECTION GRADIENTS
-  # =====================
-  subgraph cluster_selection {
-    label = 'SELECTION GRADIENT ESTIMATION'
-    style = filled
-    fillcolor = '#FEF5E7'
-    color = '#E67E22'
-
-    coeff [label = 'selection_coefficients.R\nMain wrapper\nIntegrates all methods', fillcolor = '#FCE9CF', shape = box]
-
-    linear [label = 'analyze_linear_selection.R\nw ~ β₁z₁ + β₂z₂\nType III ANOVA\nConvergence checks', fillcolor = '#FCE9CF', shape = box]
-    nonlinear [label = 'analyze_nonlinear_selection.R\nw = β₁z₁ + β₂z₂\n+ ½γ₁₁z₁² + ½γ₂₂z₂²\n+ γ₁₂z₁z₂\nVIF checks', fillcolor = '#FCE9CF', shape = box]
-
-    extract [label = 'extract_results.R\nβ (linear)\nγ = 2β_quad\nγ_ij = β_interaction', fillcolor = '#FCE9CF', shape = box]
-    diff [label = 'selection_differential.R\nS = Cov(z, w)\n= mean(z × w) when z standardized', fillcolor = '#FCE9CF', shape = box]
-    disrupt [label = 'analyze_disruptive_selection.R\nSingle trait: w ~ z + z²\nγ = 2β_quad\nγ > 0: disruptive\nγ < 0: stabilizing', fillcolor = '#FCE9CF', shape = box]
-
-    coeff -> linear [label = 'multivariate', color = '#E67E22']
-    coeff -> nonlinear [label = 'multivariate', color = '#E67E22']
-    coeff -> disrupt [label = 'univariate', color = '#E67E22']
-
-    linear -> extract [label = 'coefficients', color = '#E67E22']
-    nonlinear -> extract [label = 'coefficients', color = '#E67E22']
-    disrupt -> extract [label = 'coefficients', color = '#E67E22']
-
-    extract -> diff [label = 'combined results', color = '#E67E22']
-  }
-
-  # =====================
-  # FITNESS SURFACES
-  # =====================
-  subgraph cluster_surface {
-    label = 'NONPARAMETRIC FITNESS SURFACES'
-    style = filled
-    fillcolor = '#E8F8F5'
-    color = '#1ABC9C'
-
-    uni [label = 'univariate_spline.R\nw = α + s(z) + ε\nGAM with mgcv::gam()\nk = basis dimension', fillcolor = '#D5F5E3', shape = box]
-    uni_plot [label = 'plot_univariate_fitness.R\nLine plot\n95% confidence bands\nw ± 1.96 × SE', fillcolor = '#D5F5E3', shape = box]
-
-    corr [label = 'correlated_fitness_surface.R\nw = α + f(z₁,z₂) + ε\nMethod: GAM (binary)\nMethod: TPS (continuous)\nReturns grid with .fit', fillcolor = '#D5F5E3', shape = box]
-    corr_plot [label = 'plot_correlated_fitness.R\nContour plots\nEnhanced: + original data\nOptimal point (yellow)', fillcolor = '#D5F5E3', shape = box]
-
-    uni -> uni_plot [label = 'grid with fit/lwr/upr', color = '#1ABC9C']
-    corr -> corr_plot [label = 'grid with .fit', color = '#1ABC9C']
-  }
-
-  # =====================
-  # ADAPTIVE LANDSCAPE
-  # =====================
-  subgraph cluster_adaptive {
-    label = 'ADAPTIVE LANDSCAPE (Wrightian)'
-    style = filled
-    fillcolor = '#FDEDEC'
-    color = '#C0392B'
-
-    adapt [label = 'adaptive_landscape.R\nW̄ = g(z̄₁,z̄₂)\nPopulation mean fitness\nSimulation: mvrnorm(n, μ = z̄, Σ = P)\nReturns grid with .mean_fit', fillcolor = '#FADBD8', shape = box]
-    adapt_plot [label = 'plot_adaptive_landscape.R\nContour plots\n3D perspective\nOptimum population phenotype', fillcolor = '#FADBD8', shape = box]
-
-    adapt -> adapt_plot [label = 'grid with .mean_fit', color = '#C0392B']
-  }
-
-  # =====================
-  # COMPARISON & INFERENCE
-  # =====================
-  subgraph cluster_compare {
-    label = 'COMPARISON & INFERENCE'
-    style = filled
-    fillcolor = '#EBF5FB'
-    color = '#2980B9'
-
-    compare [label = 'compare_fitness_surfaces.R\nSide-by-side plots\nOverlay comparison\nCorrelation between surfaces', fillcolor = '#D4E6F1', shape = box]
-    boot [label = 'bootstrap_selection.R\nBootstrap CI for gradients\nResampling with replacement\nReturns: confidence intervals', fillcolor = '#D4E6F1', shape = box]
-  }
-
-  # =====================
-  # FLOW CONNECTIONS
-  # =====================
-  detect -> coeff [label = 'fitness type', color = '#7F8C8D', penwidth = 2]
-
-  # From selection gradients to surfaces
-  extract -> uni [label = 'gradients', color = '#7F8C8D', style = dashed]
-  extract -> corr [label = 'gradients', color = '#7F8C8D', style = dashed]
-
-  # Correlated fitness feeds adaptive landscape
-  corr -> adapt [label = 'fitted model', color = '#C0392B', penwidth = 2, style = bold]
-
-  # Comparison
-  corr -> compare [label = 'correlated surface', color = '#2980B9', style = dashed]
-  adapt -> compare [label = 'adaptive landscape', color = '#2980B9', style = dashed]
-
-  # Additional connections
-  diff -> compare [label = 'selection strength', color = '#7F8C8D', style = dotted]
-
-  # =====================
-  # LEGEND
-  # =====================
-  subgraph cluster_legend {
-    label = 'LEGEND'
-    style = filled
-    fillcolor = '#F9F9F9'
-    color = '#BDC3C7'
-
-    legend1 [label = 'Solid arrows: Data flow', fillcolor = '#F9F9F9', shape = plaintext]
-    legend2 [label = 'Dashed arrows: Information flow', fillcolor = '#F9F9F9', shape = plaintext]
-    legend3 [label = 'Dotted arrows: Optional analysis', fillcolor = '#F9F9F9', shape = plaintext]
-    legend4 [label = 'Bold arrows: Key dependency', fillcolor = '#F9F9F9', shape = plaintext]
-
-    legend1 -> legend2 -> legend3 -> legend4 [style = invis]
-  }
-}
-")
-```
 ---
 
 ## 4. Installation and Requirements
@@ -375,17 +246,17 @@ digraph workflow {
 
 ```{r, message=FALSE, warning=FALSE}
 required_packages <- c(
-  "mgcv", # GAM models
-  "fields", # Thin plate splines
-  "MASS", # multivariate normal simulation
-  "Matrix", # matrix operations
-  "ggplot2", # plotting
-  "dplyr", # data manipulation
-  "tidyr", # data tidying
-  "here", # path handling
-  "ggrepel", # labels
-  "viridis", # color scales
-  "patchwork"
+  "mgcv", # GAM models for spline-based fitness functions
+  "fields", # Thin-plate splines (Tps) for continuous fitness surfaces
+  "MASS", # Multivariate normal simulation (mvrnorm) for adaptive landscape
+  "Matrix", # Positive-definite matrix correction (nearPD)
+  "car", # Type III ANOVA and variance inflation factors (VIF)
+  "akima", # Surface interpolation for fitness surface comparison
+  "ggplot2", # Plotting
+  "dplyr", # Data manipulation and group-level operations
+  "ggrepel", # Non-overlapping text labels in plots
+  "viridis", # Perceptually uniform color scales
+  "patchwork" # Combining multiple plots
 )
 
 missing <- required_packages[!required_packages %in% installed.packages()[, "Package"]]
@@ -404,7 +275,7 @@ function_files <- c(
   "correlated_fitness_surface.R",
   "detect_family.R",
   "extract_results.R",
-  "selection_analysis.R",
+  "extract_results.R",
   "selection_differential.R",
   "selection_coefficients.R",
   "univariate_spline.R"
@@ -426,14 +297,14 @@ plotting_files <- c(
 )
 
 all_files <- list(
-  functions = list(path = c("R", "functions"), files = function_files),
-  scripts   = list(path = c("R", "scripts"), files = scripts_files),
-  plotting  = list(path = c("R", "plotting"), files = plotting_files)
+  functions = list(path = "R/functions", files = function_files),
+  scripts   = list(path = "R/scripts", files = scripts_files),
+  plotting  = list(path = "R/plotting", files = plotting_files)
 )
 
 for (group in all_files) {
   for (f in group$files) {
-    file_path <- do.call(here::here, as.list(c(group$path, f)))
+    file_path <- file.path(group$path, f)
 
     if (file.exists(file_path)) {
       source(file_path)
@@ -445,56 +316,39 @@ for (group in all_files) {
 }
 ```
 
-### 4.2 Package Descriptions
-
-| Package | Purpose |
-|---------|--------|
-| `mgcv` | Generalized additive models (GAMs) for flexible spline-based fitness estimation |
-| `fields` | Thin-plate spline (TPS) interpolation for bivariate fitness surfaces |
-| `MASS` | Multivariate normal simulation (`mvrnorm`) for adaptive landscape generation |
-| `Matrix` | Matrix operations and positive-definite corrections (`nearPD`) |
-| `car` | Type III ANOVA and variance inflation factor (VIF) diagnostics |
-| `ggplot2` | Visualization of fitness functions and contour surfaces |
-| `dplyr` | Data manipulation and transformation (filtering, summarizing) |
-| `tidyr` | Data reshaping (long/wide format conversion) |
-| `ggrepel` | Improved text labeling in plots (avoids overlap) |
-| `viridis` | Perceptually uniform color scales for scientific visualization |
-| `here` | Robust and reproducible file path management |
-
 ---
 
 ## 5. Detailed Function Reference
 
 ### 5.1 `prepare_selection_data()`
 
-**Purpose:** Preprocesses raw data for selection analysis.
+**Purpose:** Preprocesses raw data for selection analysis by standardizing traits, computing relative fitness, and handling missing values. Supports group-level processing for multi-year or multi-site studies.
 
-```R
+```r
 prepare_selection_data(
-  data, # Data frame
-  fitness_col, # Name of fitness column (character)
-  trait_cols, # Vector of trait column names
-  standardize = TRUE, # Standardize traits to mean 0, SD 1
-  add_relative = TRUE, # Add relative fitness column
-  na_action = c("warn", "drop", "none"), # How to handle NAs
-  name_relative = "relative_fitness" # Name for relative fitness column
+  data,                              # Data frame
+  fitness_col,                       # Name of fitness column (character)
+  trait_cols,                        # Vector of trait column names
+  standardize    = TRUE,             # Standardize traits to mean 0, SD 1
+  group          = NULL,             # Optional grouping variable (e.g., "year", "site")
+  add_relative   = TRUE,             # Add relative fitness column
+  na_action      = c("warn", "drop", "none"),
+  name_relative  = "relative_fitness"# Name for relative fitness column
 )
 ```
 
 **Returns:** Modified data frame with:
 - Standardized traits (if `standardize = TRUE`)
 - Relative fitness column (if `add_relative = TRUE`)
-- Potentially dropped NA rows (if `na_action = "drop"`)
+- Dropped NA rows (if `na_action = "drop"`)
 
 **Example:**
 
 ```{r, message=FALSE, warning=FALSE}
-set.seed(42)
-
 raw_data <- data.frame(
   survival = rbinom(100, 1, 0.6),
-  size = rnorm(100, 10, 2),
-  color = rnorm(100, 5, 1)
+  size     = rnorm(100, 10, 2),
+  color    = rnorm(100, 5, 1)
 )
 
 prepared <- prepare_selection_data(
@@ -506,76 +360,92 @@ prepared <- prepare_selection_data(
   na_action = "drop"
 )
 
-cat("size:", nrow(prepared), "\n")
+cat("Rows:", nrow(prepared), "\n")
+cat("Trait means after standardization:\n")
+print(colMeans(prepared[, c("size", "color")]))
+cat("Relative fitness mean:", mean(prepared$relative_fitness), "\n")
 head(prepared)
 ```
 
 ### 5.2 `detect_family()`
 
-**Purpose:** Automatically determines whether fitness is binary or continuous.
+**Purpose:** Automatically determines the appropriate fitness type and GLM family for p-value calculation based on the distribution of fitness values.
 
 ```R
 detect_family(y) # y = fitness vector
 ```
 
-**Logic:**
-- **Binary** if: ≤ 2 unique values, all in {0,1}, and n ≥ 10
-- **Continuous** otherwise
+**Detection logic (in order of priority):**
+- **Binary**: ≤ 2 unique values, all in {0, 1} → `binomial(logit)`
+- **Count**: non-negative integers (> 2 unique values) → `poisson(log)`
+- **Proportion**: values in [0, 1] but not binary → `gaussian()` (treated as continuous)
+- **Continuous**: all other numeric values → `gaussian()`
 
 **Returns:** List with:
-- `$type`: "binary" or "continuous"
-- `$family`: Appropriate GLM family object
+- `$type`: `"binary"`, `"count"`, or `"continuous"`
+- `$family`: GLM family object used for p-value calculation
+- `$note`: Description of detected fitness type
+
+**Note:** Regardless of detected type, OLS is always used to estimate selection gradients ($\beta$, $\gamma$). The family is used only for obtaining valid p-values via GLM.
 
 **Example:**
 
 ```{r, message=FALSE, warning=FALSE}
-# Binary fitness
-fitness_binary <- c(1, 0, 1, 1, 0, 1)
+# Binary fitness (survival)
+fitness_binary <- rbinom(50, 1, 0.6)
 detect_family(fitness_binary)
 
-# Continuous fitness
-fitness_cont <- c(2.3, 4.1, 3.2, 5.6, 1.8)
+# Count fitness (offspring number)
+fitness_count <- rpois(50, lambda = 3)
+detect_family(fitness_count)
+
+# Continuous fitness (growth rate)
+fitness_cont <- rnorm(50, mean = 5, sd = 1)
 detect_family(fitness_cont)
 ```
 
 ### 5.3 `selection_differential()`
 
-**Purpose:** Calculates the selection differential ($S$) for a single trait.
+**Purpose:** Calculates the selection differential ($S$) for a single trait. Supports group-level calculation for multi-year or multi-site studies.
 
-```R
+```r
 selection_differential(
   data,
   fitness_col,
   trait_col,
-  assume_standardized = TRUE, # Whether trait is already standardized
-  use_relative = TRUE # Use relative fitness
+  standardized   = TRUE,   # Whether trait is already standardized (mean=0, SD=1)
+  use_relative   = TRUE,   # Whether to relativize fitness within function
+  group          = NULL,   # Optional grouping variable (e.g., "year", "site")
+  return_grouped = FALSE   # If TRUE, return S per group; if FALSE, return weighted mean
 )
 ```
 
-**Formula:** $
-S = \text{Cov}(z, w)
-$
+**Formula:**
+$$S = \text{Cov}(z, w)$$
 
 When traits are standardized ($\bar{z} = 0$), this simplifies to:
-$$S = \mathbb{E}(z \times w) = \frac{1}{n}\sum_{i=1}^n z_i w_i$$
+$$S = \frac{1}{n}\sum_{i=1}^n z_i w_i$$
+
+**Returns:**
+- `group = NULL`: single numeric value (overall $S$)
+- `group` specified + `return_grouped = TRUE`: data frame with $S$ per group
+- `group` specified + `return_grouped = FALSE`: weighted mean $S$ across groups
 
 **Example:**
 ```{r, message=FALSE, warning=FALSE}
-# Calculate selection differential for size
 S_size <- selection_differential(
-  data = prepared,
-  fitness_col = "relative_fitness",
-  trait_col = "size",
-  assume_standardized = TRUE,
+  data         = prepared,
+  fitness_col  = "relative_fitness",
+  trait_col    = "size",
+  standardized = TRUE,
   use_relative = TRUE
 )
 
-# Calculate for color
 S_color <- selection_differential(
-  data = prepared,
-  fitness_col = "relative_fitness",
-  trait_col = "color",
-  assume_standardized = TRUE,
+  data         = prepared,
+  fitness_col  = "relative_fitness",
+  trait_col    = "color",
+  standardized = TRUE,
   use_relative = TRUE
 )
 
@@ -586,7 +456,7 @@ cat("Color:", round(S_color, 4), "\n")
 
 ### 5.4 `analyze_linear_selection()`
 
-**Purpose:** Estimates linear selection gradients ($\boldsymbol{\beta}$) with comprehensive diagnostics.
+**Purpose:** Estimates linear selection gradients ($\boldsymbol{\beta}$) with comprehensive diagnostics. Always uses OLS for gradient estimation; uses logistic GLM for valid p-values when fitness is binary.
 
 ```R
 analyze_linear_selection(
@@ -598,36 +468,55 @@ analyze_linear_selection(
 ```
 
 **Features:**
-- Sample size checks (warning if n < 10)
+- Sample size check (warning if n < 10)
 - Missing data handling
-- Convergence checks for GLM
-- Type III ANOVA (if `car` package available)
-- Separation detection for binary models
+- Type III ANOVA via `car::Anova()`
+- VIF check for multicollinearity (warning if VIF > 5)
+- Convergence and separation checks for binary GLM
 
-**Returns:** List containing:
-- `$model`: Fitted model object (lm or glm)
-- `$summary`: Model summary
-- `$anova`: Type III ANOVA table (if available)
+**Returns:**
+
+For continuous fitness:
+- `$model`: `lm` object (OLS — coefficients = $\beta$)
+- `$summary`: `summary.lm` object (coefficients, SE, p-values)
+- `$anova`: Type III ANOVA table
+- `$vif`: Variance inflation factors
+- `$fitness_type`: `"continuous"`
+
+For binary fitness:
+- `$model$ols`: `lm` object (OLS — coefficients = $\beta$)
+- `$model$glm`: `glm` object (logistic — p-values only)
+- `$summary$ols`: `summary.lm` (coefficients, SE)
+- `$summary$glm`: `summary.glm` (Wald test p-values)
+- `$anova`: Type III ANOVA from GLM
+- `$vif`: Variance inflation factors from OLS
+- `$fitness_type`: `"binary"`
 
 **Example:**
 
 ```{r, message=FALSE, warning=FALSE}
 linear_results <- analyze_linear_selection(
-  data = prepared,
-  fitness_col = "relative_fitness",
-  trait_cols = c("size", "color"),
+  data         = prepared,
+  fitness_col  = "relative_fitness",
+  trait_cols   = c("size", "color"),
   fitness_type = "continuous"
 )
 
-# View coefficients
+# Coefficients (β) and p-values
 summary(linear_results$model)
+
+# Type III ANOVA
+linear_results$anova
+
+# VIF
+linear_results$vif
 ```
 
 ### 5.5 `analyze_nonlinear_selection()`
 
-**Purpose:** Estimates quadratic ($\gamma_{ii}$) and correlational ($\gamma_{ij}$) selection gradients.
+**Purpose:** Estimates quadratic ($\gamma_{ii}$) and correlational ($\gamma_{ij}$) selection gradients. Always uses OLS for gradient estimation; uses logistic GLM for valid p-values when fitness is binary.
 
-```R
+```r
 analyze_nonlinear_selection(
   data,
   fitness_col,
@@ -639,52 +528,91 @@ analyze_nonlinear_selection(
 **Model specification:** Automatically constructs:
 - Linear terms: $z_i$
 - Quadratic terms: $z_i^2$
-- Interaction terms: $z_i \times z_j$ (for i < j)
+- Interaction terms: $z_i \times z_j$ (for $i < j$)
 
 **Diagnostics:**
-- Sample size checks (n < 20 warning)
-- Variance inflation factors (VIF > 10 warning)
-- Convergence monitoring for GLM
+- Sample size check (warning if n < 20, or n < 2 × number of parameters)
+- VIF check for multicollinearity using `type = "predictor"`  (warning if VIF > 5)
+- Convergence and separation checks for binary GLM
+
+**Returns:**
+
+For continuous fitness:
+- `$model`: `lm` object (OLS — coefficients = $\beta$, $\gamma$)
+- `$summary`: `summary.lm` object
+- `$anova`: Type III ANOVA table
+- `$vif`: Variance inflation factors
+- `$fitness_type`: `"continuous"`
+
+For binary fitness:
+- `$model$ols`: `lm` object (OLS — coefficients = $\beta$, $\gamma$)
+- `$model$glm`: `glm` object (logistic — p-values only)
+- `$summary$ols`: `summary.lm`
+- `$summary$glm`: `summary.glm`
+- `$anova`: Type III ANOVA from GLM
+- `$vif`: Variance inflation factors from OLS
+- `$fitness_type`: `"binary"`
+
+**Note:** Quadratic coefficients $\gamma_{ii}$ are obtained by multiplying the regression estimate and SE by 2. This is handled automatically by `extract_results.R` — do not multiply manually when using `selection_coefficients()`.
 
 **Example:**
 ```{r, message=FALSE, warning=FALSE}
 nonlinear_results <- analyze_nonlinear_selection(
-  data = prepared,
-  fitness_col = "relative_fitness",
-  trait_cols = c("size", "color"),
+  data         = prepared,
+  fitness_col  = "relative_fitness",
+  trait_cols   = c("size", "color"),
   fitness_type = "continuous"
 )
 
-# Extract quadratic term for size (multiply by 2 for gamma)
+# Raw quadratic coefficient from regression
 coef(summary(nonlinear_results$model))["I(size^2)", ]
+
+# gamma_ii = 2 × regression coefficient
+gamma_size <- 2 * coef(nonlinear_results$model)["I(size^2)"]
+cat("gamma_size:", round(gamma_size, 4), "\n")
+
+# VIF
+nonlinear_results$vif
 ```
 
 ### 5.6 `analyze_disruptive_selection()`
 
-**Purpose:** Specialized function for detecting disruptive or stabilizing selection on a single trait.
+**Purpose:** Detects disruptive or stabilizing selection on a single trait using a univariate quadratic model. Supports group-level analysis for multi-year or multi-site studies.
 
-```R
+```r
 analyze_disruptive_selection(
   data,
   fitness_col,
   trait_col,
-  fitness_type = c("binary", "continuous"),
-  standardize = TRUE
+  fitness_type   = c("binary", "continuous"),
+  standardize    = TRUE,
+  group          = NULL,   # Optional grouping variable (e.g., "year", "site")
+  return_grouped = FALSE   # If TRUE, return results per group
 )
 ```
 
 **Model:** $w \sim z + z^2$
 
-**Returns:** Data frame with:
-- Linear term ($\beta$): Directional selection
-- Quadratic term ($\gamma = 2 \times b_2$): Disruptive (positive) or stabilizing (negative)
+- OLS always used for coefficient estimates
+- For binary fitness: logistic GLM used for valid p-values
+- $\gamma = 2 \times \hat{\beta}_{z^2}$, $\text{SE}(\gamma) = 2 \times \text{SE}(\hat{\beta}_{z^2})$
+
+**Returns:** Data frame with columns:
+- `Term`: trait name or `trait²`
+- `Type`: `"Linear"` or `"Quadratic"`
+- `Beta_Coefficient`: $\beta$ (linear) or $\gamma$ (quadratic)
+- `Standard_Error`: SE of estimate
+- `P_Value`: statistical significance
+- `Variance`: $\text{SE}^2$
+- `Group`: group identifier (only if `return_grouped = TRUE`)
+
 
 **Example:**
 ```{r, message=FALSE, warning=FALSE}
 disruptive_test <- analyze_disruptive_selection(
-  data = prepared,
-  fitness_col = "relative_fitness",
-  trait_col = "size",
+  data         = prepared,
+  fitness_col  = "relative_fitness",
+  trait_col    = "size",
   fitness_type = "continuous"
 )
 
@@ -693,7 +621,7 @@ print(disruptive_test)
 
 ### 5.7 `univariate_spline()`
 
-**Purpose:** Fits a flexible nonparametric fitness function using GAMs.
+**Purpose:** Fits a flexible nonparametric univariate fitness function using GAMs with penalized regression splines and REML smoothing parameter selection.
 
 ```R
 univariate_spline(
@@ -701,354 +629,404 @@ univariate_spline(
   fitness_col,
   trait_col,
   fitness_type = c("binary", "continuous"),
-  k = 10 # Basis dimension (smoothness parameter)
+  group        = NULL,  # Optional grouping variable
+  k            = NULL
 )
 ```
 
 **Technical details:**
-- Uses penalized regression splines with REML smoothing parameter selection
 - For binary fitness: binomial GAM with logit link
-- For continuous: Gaussian GAM
-- Returns predictions with 95% confidence intervals
+- For continuous fitness: Gaussian GAM
+- `k` is automatically reduced if insufficient unique trait values exist
+- Returns predictions with 95% confidence intervals on the response scale
+
+**Returns:** Object of class `univariate_fitness` containing:
+- `$model`: fitted GAM object
+- `$grid`: data frame with `trait`, `fit`, `lwr`, `upr` columns
+- `$fitness_type`: `"binary"` or `"continuous"`
+- `$family`: GLM family used
+- `$k`: basis dimension used
+- `$n_obs`: number of observations used
 
 **Example:**
 ```{r, message=FALSE, warning=FALSE, cache=FALSE}
-n_unique <- length(unique(prepared$size[complete.cases(prepared$size)]))
-n_obs <- sum(complete.cases(prepared$size))
-
-# k should be:
-# - At most n_unique - 1 (can't have more basis than unique values)
-# - At most n_obs / 2 (to avoid overfitting)
-# - At least 3 (minimum for smoothness)
-# - At most 8 (cap for interpretability)
-
-k_val <- min(
-  8,
-  n_unique - 1,
-  floor(n_obs / 2) # Avoid overfitting
-)
-
-k_val <- max(3, k_val)
-
-cat("Fitting spline with:\n")
-cat("  - Unique values:", n_unique, "\n")
-cat("  - Observations:", n_obs, "\n")
-cat("  - k =", k_val, "\n")
-
+# k is selected adaptively by default: min(10, max(5, n_unique - 1))
+# Override with k = <value> if needed
 spline_fit <- univariate_spline(
-  data = prepared,
-  fitness_col = "survival",
-  trait_col = "size",
-  fitness_type = "binary",
-  k = k_val
+  data         = prepared,
+  fitness_col  = "relative_fitness",
+  trait_col    = "size",
+  fitness_type = "continuous"
 )
 
+cat("k used:", spline_fit$k, "\n")
+cat("Observations:", spline_fit$n_obs, "\n")
 head(spline_fit$grid)
 ```
 
 ### 5.8 `plot_univariate_fitness()`
 
-**Purpose:** Visualizes univariate correlated fitness functions with confidence bands.
+**Purpose:** Visualizes univariate correlated fitness functions with 95% confidence bands.
 
-```R
+```r
 plot_univariate_fitness(
-  uni, # Output from univariate_spline()
-  trait_col,
-  title = NULL
+  uni,                          # Output from univariate_spline()
+  trait_col,                    # Trait column name (character)
+  title           = NULL,       # Plot title
+  show_points     = TRUE,       # Show original data points
+  point_alpha     = 0.25,       # Transparency of data points
+  ribbon_fill     = NA,         # Fill colour for CI ribbon (NA = no fill)
+  ribbon_linetype = "dashed"    # Linetype for CI bounds
 )
 ```
 
-**Returns:** ggplot2 object with line plot and 95% confidence bands.
+**Returns:** `ggplot2` object with:
+- Solid line: predicted fitness
+- Dashed lines: 95% confidence bounds
+- Optional data points (if `show_points = TRUE` and data stored in object)
 
 **Example:**
-```{r, message=FALSE, warning=FALSE, fig.align="center", out.width="80%", fig.cap="Figure 1. Correlated fitness function for body size"}
+```{r, message=FALSE, warning=FALSE, fig.align="center", out.width="80%", fig.cap="Correlated fitness function for body size"}
 p <- plot_univariate_fitness(
-  spline_fit,
-  "size",
-  title = "Correlated Fitness Function: Body Size"
+  uni       = spline_fit,
+  trait_col = "size",
+  title     = "Correlated Fitness Function: Body Size"
 )
 print(p)
 ```
 
 
-### 5.8 `correlated_fitness_surface()`
+### 5.9 `correlated_fitness_surface()`
 
-**Purpose:** Estimates 2D fitness surfaces using thin-plate splines (continuous) or GAMs (binary).
+**Purpose:** Estimates a 2D correlated fitness surface relating individual fitness to two traits simultaneously, using GAM or thin-plate splines.
 
-```R
+```r
 correlated_fitness_surface(
   data,
   fitness_col,
-  trait_cols, # Exactly 2 traits
-  grid_n = 60, # Grid resolution (grid_n × grid_n points)
-  method = "auto", # "auto", "gam", or "tps"
-  scale_traits = TRUE,
-  k = 30 # Basis dimension for GAM method
+  trait_cols,        # Exactly 2 traits
+  grid_n       = 60, # Grid resolution (grid_n × grid_n points)
+  method       = "auto", # "auto", "gam", or "tps"
+  scale_traits = FALSE,  # Deprecated — standardize upstream instead
+  group        = NULL,   # Optional grouping variable
+  k            = NULL    # Basis dimension; NULL = adaptive
 )
 ```
 
 **Method selection:**
-- `"tps"`: Uses `fields::Tps()` for continuous fitness (spline-based)
-- `"gam"`: Uses `mgcv::gam()` with tensor product smooth (works for both)
-- `"auto"`: Chooses based on fitness type (GAM for binary, TPS for continuous)
+- `"auto"`: GAM for binary fitness, TPS for continuous fitness
+- `"gam"`: `mgcv::gam()` with thin-plate spline smooth — works for both binary and continuous
+- `"tps"`: `fields::Tps()` — continuous fitness only
+
+**Adaptive k:** When `k = NULL` (default), k is selected as:
+$$k = \min\left(30,\; \max\left(10,\; \lfloor\sqrt{n_{\text{unique},1} \times n_{\text{unique},2}}\rfloor\right)\right)$$
 
 **Returns:** List containing:
-- `$model`: Fitted model object
-- `$grid`: Data frame with trait values and predicted fitness
-- `$method`: Method used
-- `$data_type`: "binary" or "continuous"
+- `$model`: Fitted model object (`gam` or `Tps`)
+- `$grid`: Data frame with trait values and `.fit` column (predicted fitness)
+- `$method`: Method used (`"gam"` or `"tps"`)
+- `$formula_used`: Formula variant used (GAM only: `"main"`, `"alt1"`, or `"alt2"`)
+- `$k_used`: Actual k used for fitting (GAM only)
+- `$data_type`: `"binary"` or `"continuous"`
+- `$trait_cols`: Trait column names
+- `$surface_type`: `"correlated_fitness"`
+
 
 **Example:**
 ```{r, message=FALSE, warning=FALSE}
 surface <- correlated_fitness_surface(
-  data = prepared,
+  data        = prepared,
+  grid_n      = 50,
   fitness_col = "relative_fitness",
-  trait_cols = c("size", "color"),
-  method = "gam",
-  scale_traits = TRUE
+  trait_cols  = c("size", "color"),
+  method      = "gam"
 )
 
-# Find optimum (maximum fitness)
+cat("Method used:", surface$method, "\n")
+cat("k used:", surface$k_used, "\n")
+
 optimum <- surface$grid[which.max(surface$grid$.fit), ]
 print(optimum)
 ```
 
-### 5.9 `plot_correlated_fitness()`
+### 5.10 `plot_correlated_fitness()`
 
-**Purpose:** Visualize 2D fitness surfaces with contour plots.
-```R
+**Purpose:** Visualizes a 2D correlated fitness surface as a filled contour plot.
+
+```r
+# Basic version
 plot_correlated_fitness(
-  tps, # Output from univariate_spline()
-  trait_col,
-  bins
-  title = NULL
+  tps,                    # Output from correlated_fitness_surface()
+  trait_cols,             # Character vector of length 2
+  bins         = 12,      # Number of contour bins
+  point_alpha  = 0.7,     # Transparency of data points
+  show_points  = FALSE,   # Overlay original data points
+  show_optimum = TRUE     # Mark optimal trait combination (gold diamond)
 )
 
-p <- plot_correlated_fitness_enhanced(
-  tps, correlated_fitness_surface
-  trait_cols,
-  original_data,
-  fitness_col,
-  bins = 12
+# Enhanced version — overlays original data coloured by fitness
+plot_correlated_fitness_enhanced(
+  tps,                    # Output from correlated_fitness_surface()
+  trait_cols    = NULL,   # Character vector of length 2 (inferred if NULL)
+  original_data = NULL,   # Original data frame for point overlay
+  fitness_col   = NULL,   # Fitness column name for point colouring
+  bins          = 12,
+  point_alpha   = 0.7,
+  show_optimum  = TRUE
 )
 ```
 
+**Returns:** `ggplot2` object with filled contour plot. The enhanced version additionally colours data points by fitness value (continuous) or survival outcome.
+
 **Example:**
 ```{r, message=FALSE, warning=FALSE, fig.width=8, fig.height=6, fig.cap="Correlated fitness surface for size and color"}
+# Basic contour plot
 p <- plot_correlated_fitness(
-  tps = surface,
+  tps        = surface,
   trait_cols = c("size", "color"),
-  bins = 12
+  bins       = 12
 )
-
 print(p)
 ```
 
 ```{r, message=FALSE, warning=FALSE, fig.width=8, fig.height=6, fig.cap="Correlated fitness surface with original data points"}
+# Enhanced version with data overlay
 p <- plot_correlated_fitness_enhanced(
-  tps = surface,
-  trait_cols = c("size", "color"),
+  tps           = surface,
+  trait_cols    = c("size", "color"),
   original_data = prepared,
-  fitness_col = "relative_fitness",
-  bins = 12
+  fitness_col   = "relative_fitness",
+  bins          = 12
 )
-
 print(p)
 ```
 
-### 5.10 `adaptive_landscape()`
+### 5.11 `adaptive_landscape()`
 
-**Purpose:** Calculates the Wrightian adaptive landscape, which is a population-level concept distinct from correlated fitness surfaces.
+**Purpose:** Calculates the Wrightian adaptive landscape — population mean fitness as a function of population mean phenotype. This is a population-level concept distinct from correlated fitness surfaces (individual-level).
 
-```R
+```r
 adaptive_landscape(
-  data,                      # Individual-level data frame
-  fitness_model,             # Fitted model from correlated_fitness_surface()
-  trait_cols,                # Character vector of length 2 with trait names
-  group_col = NULL,          # Optional grouping column (e.g., "species")
-  population_variance = NULL,# Within-population variance-covariance matrix
-  simulation_n = 1000,       # Number of individuals to simulate per grid point
-  grid_n = 50,               # Grid resolution (grid_n × grid_n)
-  custom_range = NULL        # Optional custom range for population means
+  data,
+  fitness_model,              # Fitted model from correlated_fitness_surface()
+  trait_cols,                 # Character vector of length 2
+  group_col          = NULL,  # Optional grouping column (e.g., "year", "site")
+  population_variance = NULL, # Within-population P matrix; estimated if NULL
+  simulation_n       = 1000,  # Individuals simulated per grid point
+  grid_n             = 50,    # Grid resolution (grid_n × grid_n)
+  custom_range       = NULL   # Optional named list with custom trait ranges
 )
 ```
 
-**Calculation Steps:**
-- 1. Create grid of possible population means ($\bar{z}_1$, $\bar{z}_2$) across the trait range
-- 2. Estimate within-population variance from the data
-- 3. Simulate individuals around each population mean: $\mathbf{z} \sim \mathcal{N}(\bar{\mathbf{z}}, \mathbf{P})$
-- 4. Predict fitness for each simulated individual using the fitted model
-- 5. Calculate mean fitness $\bar{W} = \frac{1}{N}\sum \hat{w}_{\text{ind}}$
-- 6. Find optimum - the population mean that maximizes $\bar{W}$
+**Calculation steps:**
+1. Create grid of candidate population means ($\bar{z}_1$, $\bar{z}_2$)
+2. Estimate within-population variance-covariance matrix $\mathbf{P}$ from data (or use provided)
+3. For each grid point, simulate individuals: $\mathbf{z}_j \sim \mathcal{N}(\bar{\mathbf{z}}, \mathbf{P})$
+4. Predict individual fitness using the fitted model: $\hat{w}_j = \hat{f}(\mathbf{z}_j)$
+5. Compute mean fitness: $\bar{W}(\bar{\mathbf{z}}) = \frac{1}{N}\sum_{j=1}^N \hat{w}_j$
+6. Find optimum: $\bar{\mathbf{z}}^* = \arg\max \bar{W}$
+
+**Returns:** Object of class `adaptive_landscape` containing:
+- `$grid`: Data frame of population means with `.mean_fit` column
+- `$optimum`: Row of `$grid` with highest mean fitness
+- `$population_variance`: $\mathbf{P}$ matrix used for simulation
+- `$simulation_n`: Number of individuals simulated per grid point
+- `$actual_population_means`: Actual group means (if `group_col` provided)
+- `$fitness_model_class`: Class of fitted model (`"gam"` or `"Tps"`)
+- `$data_summary`: List with n_individuals, trait ranges, standardization check
+- `$surface_type`: `"adaptive_landscape"`
+
+**Note:** If the optimum falls at the boundary of the trait grid, it may indicate that the true optimum lies outside the observed trait range. Consider using `custom_range` to extend the grid, or interpreting the result with caution.
+
+**Example:**
+```{r, message=FALSE, warning=FALSE}
+landscape <- adaptive_landscape(
+  data          = prepared,
+  fitness_model = surface$model,
+  trait_cols    = c("size", "color"),
+  grid_n        = 50,
+  simulation_n  = 1000
+)
+
+# Optimal population mean phenotype
+landscape$optimum
+
+# P matrix used
+round(landscape$population_variance, 4)
+```
+
+
+### 5.12 `plot_adaptive_landscape.R`
+
+**Purpose:** Visualizes the adaptive landscape as a 2D contour map or 3D perspective plot showing how population mean fitness varies with population mean phenotypes.
+
+```r
+# 2D contour plot
+plot_adaptive_landscape(
+  landscape,                   # Output from adaptive_landscape()
+  trait_cols,                  # Two trait column names
+  original_data     = NULL,    # Optional: overlay individual data points
+  group_col         = NULL,    # Optional: label actual population means by group
+  bins              = 12,      # Number of contour bins
+  show_optimum      = TRUE,    # Show optimal population mean (gold diamond)
+  show_actual_means = TRUE,    # Show actual population means (red points)
+  point_alpha       = 0.8      # Transparency of points
+)
+
+# 3D perspective plot
+plot_adaptive_landscape_3d(
+  landscape,                   # Output from adaptive_landscape()
+  trait_cols,                  # Two trait column names
+  theta         = -30,         # Azimuthal rotation angle
+  phi           = 30,          # Colatitude tilt angle
+  grid_n        = 200,         # Interpolation resolution (higher = smoother)
+  color_palette = NULL         # Colour palette; defaults to viridis::plasma(100)
+)
+```
 
 **Returns:**
-- `$grid`: Population means with mean fitness
-- `$optimum`: Population mean with highest fitness
-- `$actual_population_means`: Actual means (if group_col provided)
+- `plot_adaptive_landscape()`: `ggplot2` object
+- `plot_adaptive_landscape_3d()`: base R perspective plot (no `print()` needed)
 
 **Example:**
-```{r, dev="png", fig.show="hold"}
-landscape <- adaptive_landscape(
-  data = prepared,
-  fitness_model = surface$model,
-  trait_cols = c("size", "color"),
-  grid_n = 50,
-  simulation_n = 1000
-)
-
-landscape$optimum
-```
-
-
-### 5.11 `plot_adaptive_landscape.R`
-
-**Purpose:** Creates a 2D contour map showing how mean fitness varies with population mean phenotypes.
-
-```R
-plot_adaptive_landscape(
-  landscape,                  # Output from adaptive_landscape()
-  trait_cols,                 # Two trait column names
-  original_data = NULL,       # Optional original data for overlaying points
-  group_col = NULL,           # Optional grouping column for labels
-  bins = 12,                  # Number of contour bins
-  show_optimum = TRUE,        # Show optimal population mean (yellow star)
-  show_actual_means = TRUE    # Show actual population means (red points)
-)
-
-plot_adaptive_landscape_3d(
-  landscape,                  # Output from adaptive_landscape()
-  trait_cols,                 # Two trait column names
-  theta = -30,                # Azimuthal rotation angle
-  phi = 30,                   # Colatitude tilt angle
-  grid_n = 150                # Resolution for interpolation (higher = smoother)
-)
-```
-
-**Example:**
-```{r, message=FALSE, warning=FALSE, fig.width=8, fig.height=6, fig.cap="Adaptive landscape showing mean fitness as function of population mean size and color"}
+```{r, message=FALSE, warning=FALSE, fig.width=8, fig.height=6, fig.cap="Adaptive landscape showing mean fitness as a function of population mean size and color"}
 p <- plot_adaptive_landscape(
-  landscape = landscape,
+  landscape  = landscape,
   trait_cols = c("size", "color"),
-  bins = 12
+  bins       = 12
 )
-
 print(p)
 ```
 
-```{r, message=FALSE, warning=FALSE, fig.width=10, fig.height=7, fig.cap="3D adaptive landscape showing the shape of mean fitness"}
-p <- plot_adaptive_landscape_3d(
-  landscape = landscape,
+```{r, message=FALSE, warning=FALSE, fig.width=10, fig.height=7, fig.cap="3D adaptive landscape"}
+plot_adaptive_landscape_3d(
+  landscape  = landscape,
   trait_cols = c("size", "color"),
-  theta = -30,
-  phi = 30,
-  grid_n = 300
+  theta      = -30,
+  phi        = 30,
+  grid_n     = 200
 )
-
-print(p)
 ```
 
+### 5.13 `selection_coefficients()`
 
-### 5.12 `selection_coefficients()`
+**Purpose:** Main wrapper function that runs a complete selection analysis, data preparation, fitness type detection, linear and nonlinear gradient estimation, and coefficient extraction, in a single call.
 
-**Purpose:** Main wrapper function that runs a complete selection analysis.
-
-```R
+```r
 selection_coefficients(
   data,
   fitness_col,
   trait_cols,
-  fitness_type = c("auto", "binary", "continuous"),
-  standardize = TRUE,
-  use_relative_for_fit = TRUE
+  fitness_type         = c("auto", "binary", "continuous"),
+  standardize          = TRUE,
+  group                = NULL,   # Optional grouping variable (e.g., "year", "site")
+  use_relative_for_fit = TRUE,   # Use relative fitness for continuous data
+  return_grouped       = FALSE   # If TRUE and group specified, return results per group
 )
 ```
 
 **Workflow:**
-1. Prepares data (standardization, relative fitness)
-2. Detects fitness type (if `auto`)
-3. Runs linear selection analysis
-4. Runs nonlinear selection analysis
-5. Extracts all coefficients into a single table
+1. Prepares data via `prepare_selection_data()` (standardization, relative fitness)
+2. Detects fitness type via `detect_family()` (if `fitness_type = "auto"`)
+3. Runs linear selection analysis via `analyze_linear_selection()`
+4. Runs nonlinear selection analysis via `analyze_nonlinear_selection()`
+5. Extracts and combines all coefficients via `extract_results.R`
 
 **Returns:** Data frame with columns:
-- `Term`: Coefficient name (e.g., "size", "size²", "size×color")
-- `Type`: "Linear", "Quadratic", or "Correlational"
-- `Beta_Coefficient`: Estimated selection gradient
-- `Standard_Error`: Standard error of estimate
-- `P_Value`: Statistical significance
-- `Variance`: Square of standard error
+- `Term`: coefficient name (e.g., `"size"`, `"size²"`, `"size×color"`)
+- `Type`: `"Linear"`, `"Quadratic"`, or `"Correlational"`
+- `Beta_Coefficient`: estimated selection gradient ($\beta$ or $\gamma$)
+- `Standard_Error`: standard error of estimate
+- `P_Value`: statistical significance
+- `Variance`: $\text{SE}^2$
+- `Group`: group identifier (only if `return_grouped = TRUE`)
+
+**Note:** `prepare_selection_data()` is called automatically — no need to standardize data manually before calling this function.
 
 **Example:**
 ```{r, message=FALSE, warning=FALSE}
-results_binary <- selection_coefficients(
-  data = prepared,
-  fitness_col = "survival", # Binary 0/1
-  trait_cols = c("size", "color"), # Only available traits
+results <- selection_coefficients(
+  data         = raw_data,
+  fitness_col  = "survival",
+  trait_cols   = c("size", "color"),
   fitness_type = "binary",
-  standardize = TRUE
+  standardize  = TRUE
 )
 
-print(results_binary)
+print(results)
 ```
 
-### 5.13 Extraction Functions
+### 5.14 Extraction Functions
 
-Internal functions used by `selection_coefficients()`:
+Internal functions used by `selection_coefficients()` to parse model outputs into a standardised results table. These are not intended to be called directly by the user.
 
-- `extract_linear_coefficients(trait_cols, results)`
-- `extract_quadratic_coefficients(trait_cols, results)`
-- `extract_interaction_coefficients(trait_cols, results)`
+| Function | Purpose |
+|----------|---------|
+| `extract_linear_coefficients(trait_cols, results)` | Extracts $\beta$ from linear model |
+| `extract_quadratic_coefficients(trait_cols, results)` | Extracts $\gamma_{ii} = 2\hat{\beta}_{ii}$ from nonlinear model |
+| `extract_interaction_coefficients(trait_cols, results)` | Extracts $\gamma_{ij}$ from interaction terms |
 
-These functions safely extract coefficients from model objects, handling different column names and missing terms.
-
-### 5.14 `selection_analysis()`
-
-**Purpose:** serve as a wrapper function that combines everything in one call.
-
-```{r, message=FALSE, warning=FALSE}
-analysis <- selection_analysis(
-  data = prepared,
-  fitness_col = "survival",
-  trait_cols = c("size", "color")
-)
-
-analysis$coefficients_table
-analysis$prepared_data
-analysis$fitness_type
-analysis$models$linear
-analysis$models$nonlinear
-```
-
+For binary fitness, all three functions take gradients from OLS and p-values from GLM. For continuous fitness, both come from OLS.
 
 ### 5.15 `compare_fitness_surfaces()`
 
-**Purpose:** serve as a wrapper function that combines everything in one call.
+**Purpose:** Quantitatively compares the correlated fitness surface (individual-level) with the adaptive landscape (population-level) by computing optimum locations, their Euclidean distance, and surface correlation.
+
+```r
+# Step 1: compute comparison data
+compare_fitness_surfaces_data(
+  correlated_surface,              # Output from correlated_fitness_surface()
+  adaptive_landscape,              # Output from adaptive_landscape()
+  trait_cols,
+  calculate_correlation = TRUE     # Compute Pearson r between surfaces
+)
+
+# Step 2: visualise
+plot_fitness_surfaces_comparison(
+  comparison_data,                 # Output from compare_fitness_surfaces_data()
+  bins        = 10,
+  title       = NULL,
+  point_alpha = 0.7,
+  linewidth   = 0.8,
+  show_optima = TRUE
+)
+```
+
+**Returns from `compare_fitness_surfaces_data()`:**
+- `$combined_data`: long-format data frame with both surfaces
+- `$summary_stats`: fitness range, mean, SD for each surface
+- `$optimum_individual`: trait combination maximising individual fitness
+- `$optimum_population`: trait combination maximising population mean fitness
+- `$distance_between_optima`: Euclidean distance between the two optima
+- `$correlation`: Pearson $r$ between surfaces (if `calculate_correlation = TRUE`)
+
+**Returns from `plot_fitness_surfaces_comparison()`:**
+- `$side_by_side`: `patchwork` plot with two contour panels side by side
+- `$overlay`: single contour plot overlaying both surfaces
+
+**Example:**
 
 ```{r, message=FALSE, warning=FALSE}
 comparison <- compare_fitness_surfaces_data(
   correlated_surface = surface,
   adaptive_landscape = landscape,
-  trait_cols = c("size", "color")
+  trait_cols         = c("size", "color")
 )
 
 comparison$summary_stats
+comparison$distance_between_optima
+comparison$correlation
 ```
 
-```{r, message=FALSE, warning=FALSE, fig.width=12, fig.height=5, fig.cap="Side-by-side comparison"}
+```{r, message=FALSE, warning=FALSE, fig.width=12, fig.height=5, fig.cap="Overlay comparison of correlated fitness surface and adaptive landscape"}
 plots <- plot_fitness_surfaces_comparison(
   comparison_data = comparison,
-  bins = 15
+  bins            = 15
 )
-
 print(plots$overlay)
 ```
 
-```{r, message=FALSE, warning=FALSE, fig.width=12, fig.height=5, fig.cap="Side-by-side comparison"}
-plots <- plot_fitness_surfaces_comparison(
-  comparison_data = comparison,
-  bins = 15
-)
-
+```{r, message=FALSE, warning=FALSE, fig.width=12, fig.height=5, fig.cap="Side-by-side comparison of correlated fitness surface and adaptive landscape"}
 print(plots$side_by_side)
 ```
 ---
@@ -1060,9 +1038,13 @@ print(plots$side_by_side)
 | P-value | Evidence |
 |---------|----------|
 | < 0.001 | Strong evidence of selection |
-| 0.001-0.01 | Moderate evidence |
-| 0.01-0.05 | Weak evidence |
+| 0.001 – 0.01 | Moderate evidence |
+| 0.01 – 0.05 | Weak evidence |
 | > 0.05 | No significant selection detected |
+
+**Caution:** Statistical significance depends heavily on sample size. 
+With large samples, even biologically trivial gradients may be significant. 
+Always interpret p-values alongside effect sizes.
 
 ### 6.2 Selection Types
 
@@ -1070,52 +1052,59 @@ print(plots$side_by_side)
 
 | $\beta$ sign | Interpretation |
 |--------------|----------------|
-| Positive (+) | Selection favors larger trait values |
-| Negative (-) | Selection favors smaller trait values |
-| Zero (0) | No directional selection |
+| Positive (+) | Selection favours larger trait values (positive directional selection) |
+| Negative (−) | Selection favours smaller trait values (negative directional selection) |
+| ≈ 0 | No directional selection detected |
 
-**Quadratic Selection ($\gamma$):**
+**Quadratic Selection ($\gamma_{ii}$):**
 
-| $\gamma$ sign | Interpretation | Shape |
-|---------------|----------------|-------|
-| Negative (-) | Stabilizing selection | ∩-shaped |
-| Positive (+) | Disruptive selection | ∪-shaped |
-| Zero (0) | No nonlinear selection | Linear |
+| $\gamma_{ii}$ sign | Interpretation | Fitness function shape |
+|--------------------|----------------|------------------------|
+| Negative (−) | Stabilizing selection | ∩-shaped — intermediate values favoured |
+| Positive (+) | Disruptive selection | ∪-shaped — extreme values favoured |
+| ≈ 0 | No nonlinear selection | Linear fitness function |
 
 **Correlational Selection ($\gamma_{ij}$):**
 
 | $\gamma_{ij}$ sign | Interpretation |
 |--------------------|----------------|
-| Positive (+) | Selection favors positive correlation (both traits high or both low) |
-| Negative (-) | Selection favors negative correlation (one high, one low) |
-| Zero (0) | Traits evolve independently |
+| Positive (+) | Selection favours positive trait correlation (both high or both low) |
+| Negative (−) | Selection favours negative trait correlation (one high, one low) |
+| ≈ 0 | Traits selected independently |
 
 ### 6.3 Effect Sizes
 
-**For standardized traits ($\mu=0, \sigma=1$):**
+Based on the meta-analysis of Kingsolver et al. (2001), which surveyed 
+selection gradients across natural populations:
 
 | $|\beta|$ | Effect size |
 |-----------|-------------|
-| < 0.1 | Weak selection |
-| 0.1 - 0.3 | Moderate selection |
-| > 0.3 | Strong selection |
+| < 0.1 | Weak — below the median observed in nature |
+| 0.1 – 0.5 | Moderate — typical range in natural populations |
+| > 0.5 | Strong — upper range of selection in nature |
+
+**Reference:** Kingsolver et al. (2001) reported a mean $|\beta| \approx 0.22$ 
+and median $|\beta| \approx 0.16$ across studies, suggesting that gradients 
+above 0.5 represent unusually strong selection.
 
 ### 6.4 Example Interpretations
 
 ```
 Scenario 1: β_size = 0.25, p = 0.001
-→ "Body size experiences significant positive directional selection.
-   A one-standard-deviation increase in size increases relative fitness by 0.25 units."
+  "Body size experiences significant positive directional selection.
+   A one-standard-deviation increase in size is associated with a 0.25-unit
+   increase in relative fitness, holding other traits constant."
 
 Scenario 2: γ_size = -0.15, p = 0.02
-→ "Body size shows significant stabilizing selection.
-   Intermediate sizes have highest fitness; extremes are disadvantageous."
+  "Body size shows significant stabilizing selection (γ < 0).
+   Individuals with intermediate size have the highest fitness;
+   both large and small extremes are disadvantaged."
 
-Scenario 3: γ_size x beak = 0.32, p = 0.004
-→ "Significant positive correlational selection between size and beak depth.
-   Selection favors individuals that are either both large or both small."
+Scenario 3: γ_size × beak = 0.32, p = 0.004
+  "Significant positive correlational selection between size and beak depth.
+   Selection favours individuals that are either both large-billed and large-bodied,
+   or both small-billed and small-bodied."
 ```
-
 ---
 
 ## 7. Troubleshooting and Common Issues
@@ -1127,17 +1116,19 @@ Scenario 3: γ_size x beak = 0.32, p = 0.004
 | Linear selection (continuous) | 10 | > 30 |
 | Linear selection (binary) | 20 per group | > 50 per group |
 | Nonlinear selection | 20 | > 100 |
-| Bivariate TPS | 30 | > 200 |
+| Bivariate GAM / TPS surface | 30 | > 200 |
+| Adaptive landscape (simulation) | — | > 100 (for stable $\mathbf{P}$ estimate) |
 
 ### 7.2 Convergence Issues in Binary Models
 
 **Symptoms:**
-- Very large coefficients (> 10)
+- Very large coefficients (> 10) — detected automatically by the framework
 - Extremely large standard errors
-- Warning about "complete separation"
+- Warning: `"GLM did not converge"`
+- Warning: `"Possible complete separation detected"`
 
 **Solutions:**
-```R
+```r
 # 1. Check for complete separation
 table(data$fitness, cut(data$trait, 5))
 
@@ -1152,96 +1143,79 @@ fit <- logistf(fitness ~ trait, data = data)
 
 ### 7.3 Missing Data Handling
 
-```R
+```r
 # Check missing data pattern
-library(naniar)
-gg_miss_upset(data)
+apply(data, 2, function(x) sum(is.na(x)))
 
 # Option 1: Drop rows with missing (if < 5%)
 prepared <- prepare_selection_data(..., na_action = "drop")
 
-# Option 2: Impute missing values
-library(mice)
-imp <- mice(data, m = 5)
-data_complete <- complete(imp, 1)
-
-# Option 3: Use na_action = "warn" to investigate
+# Option 2: Use na_action = "warn" to investigate without dropping
 prepared <- prepare_selection_data(..., na_action = "warn")
+
+# Option 3: Impute missing values before passing to the framework
+library(mice)
+imp          <- mice(data, m = 5)
+data_complete <- complete(imp, 1)
+prepared     <- prepare_selection_data(data_complete, ...)
 ```
 
 ### 7.4 Multicollinearity
 
-High correlations between traits can inflate standard errors:
+High correlations between traits can inflate standard errors. The framework 
+automatically checks VIF and warns if VIF > 5:
 
-```R
-# Check correlations
+```r
+# Check pairwise correlations before analysis
 cor(data[, trait_cols])
 
-# Calculate VIF
-if (requireNamespace("car", quietly = TRUE)) {
-  vif_vals <- car::vif(model)
-  # VIF > 10 indicates problematic collinearity
-}
+# Retrieve VIF from linear model results
+linear_results$vif
+
+# Retrieve VIF from nonlinear model results
+nonlinear_results$vif
 ```
+
+**Interpreting VIF:**
+
+| VIF | Interpretation |
+|-----|----------------|
+| 1 – 5 | Acceptable |
+| 5 – 10 | Moderate collinearity — interpret SE with caution |
+| > 10 | Severe collinearity — results unreliable |
 
 **Solutions:**
-- Use ridge regression
-- Collect more data
+- Remove the more collinear trait and run separate univariate analyses
+- Use principal component analysis (PCA) to create orthogonal trait axes
+- Collect more data to improve estimation stability
 
----
+### 7.5 Adaptive k Warning
 
-## 8. Output Formats and Reporting
+If `univariate_spline()` or `correlated_fitness_surface()` warns that k has 
+been reduced, it means the subset has fewer unique trait values than the 
+adaptive default:
 
-### 8.1 Table Format for Publications
-
-```R
-
-library(knitr)
-
-results_table <- results %>%
-  mutate(
-    Beta = sprintf("%.3f", Beta_Coefficient),
-    SE = sprintf("%.3f", Standard_Error),
-    P = case_when(
-      P_Value < 0.001 ~ "<0.001",
-      P_Value < 0.01 ~ sprintf("%.3f", P_Value),
-      TRUE ~ sprintf("%.3f", P_Value)
-    ),
-    Sig = case_when(
-      P_Value < 0.001 ~ "***",
-      P_Value < 0.01 ~ "**",
-      P_Value < 0.05 ~ "*",
-      TRUE ~ ""
-    )
-  ) %>%
-  select(Term, Type, Beta, SE, P, Sig)
-
-kable(results_table, caption = "Table 1. Selection gradients (±SE)")
+```r
+# Override adaptive k manually if needed
+spline_fit <- univariate_spline(..., k = 5)
+surface    <- correlated_fitness_surface(..., k = 15)
 ```
 
-### 8.2 Visualization for Reports
+### 7.6 Grid Size Mismatch in Surface Comparison
 
-```R
-library(ggplot2)
+`compare_fitness_surfaces_data()` requires both surfaces to have the same 
+`grid_n` to compute surface correlation. If they differ, correlation returns 
+`NULL`:
 
-ggplot(results, aes(x = Term, y = Beta_Coefficient, fill = Type)) +
-  geom_col(position = position_dodge()) +
-  geom_errorbar(
-    aes(
-      ymin = Beta_Coefficient - 1.96 * Standard_Error,
-      ymax = Beta_Coefficient + 1.96 * Standard_Error
-    ),
-    width = 0.2, position = position_dodge(0.9)
-  ) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  labs(x = "Trait", y = "Selection Gradient (β or γ)") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```r
+# Use matching grid_n for both surfaces
+surface   <- correlated_fitness_surface(..., grid_n = 50)
+landscape <- adaptive_landscape(..., grid_n = 50)
 ```
 
 ---
 
-## 9. References
+## 8. References
 
 1. Lande, R., & Arnold, S. J. (1983). The measurement of selection on correlated characters. *Evolution*, 37(6), 1210-1226.
 

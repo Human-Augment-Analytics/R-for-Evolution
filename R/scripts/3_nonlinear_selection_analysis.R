@@ -78,7 +78,7 @@ analyze_nonlinear_selection <- function(data, fitness_col, trait_cols, fitness_t
   vif_vals <- NULL
   if (requireNamespace("car", quietly = TRUE)) {
     vif_vals <- tryCatch(
-      car::vif(fit_ols),
+      suppressWarnings(car::vif(fit_ols)),
       error = function(e) {
         warning("VIF calculation failed: ", e$message)
         NULL
@@ -114,7 +114,7 @@ analyze_nonlinear_selection <- function(data, fitness_col, trait_cols, fitness_t
     anova_bin <- NULL
     if (requireNamespace("car", quietly = TRUE)) {
       anova_bin <- tryCatch(
-        car::Anova(fit_glm, type = "III", test.statistic = "Wald"),
+        suppressWarnings(car::Anova(fit_glm, type = "III", test.statistic = "Wald")),
         error = function(e) {
           warning("Type III ANOVA for nonlinear model failed: ", e$message)
           NULL
@@ -125,7 +125,7 @@ analyze_nonlinear_selection <- function(data, fitness_col, trait_cols, fitness_t
     }
 
     return(list(
-      mmodel = list(ols = fit_ols, glm = fit_glm),
+      model = list(ols = fit_ols, glm = fit_glm),
       summary = list(ols = sm_ols, glm = sm_glm),
       anova = anova_bin,
       vif = vif_vals,
@@ -136,7 +136,7 @@ analyze_nonlinear_selection <- function(data, fitness_col, trait_cols, fitness_t
     anova_cont <- NULL
     if (requireNamespace("car", quietly = TRUE)) {
       anova_cont <- tryCatch(
-        car::Anova(fit_ols, type = "III"),
+        suppressWarnings(car::Anova(fit_ols, type = "III")),
         error = function(e) {
           warning("Type III ANOVA for nonlinear model failed: ", e$message)
           NULL
@@ -147,8 +147,8 @@ analyze_nonlinear_selection <- function(data, fitness_col, trait_cols, fitness_t
     }
 
     return(list(
-      model_ols = fit_ols, # lm object (coefficients = gradients)
-      summary_ols = sm_ols, # summary.lm (coefficients, SE, p-values)
+      model = fit_ols, # lm object (coefficients = gradients)
+      summary = sm_ols, # summary.lm (coefficients, SE, p-values)
       anova = anova_cont, # Type III ANOVA table
       vif = vif_vals, # variance inflation factors
       fitness_type = "continuous"

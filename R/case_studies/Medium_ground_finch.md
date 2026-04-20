@@ -13,6 +13,34 @@ Univariate analyses were conducted for beak size across years to assess temporal
 
 ---
 
+
+--- Sample size by group ---
+> cat("Binary grouped data:\n")
+Binary grouped data:
+> print(table(prepared_binary_group[[GROUP]]))
+
+Crescent Pond   Little Lake 
+          892           973 
+> 
+> cat("\nContinuous grouped data:\n")
+
+Continuous grouped data:
+> print(table(prepared_continuous_group[[GROUP]]))
+
+Crescent Pond   Little Lake 
+          892           973 
+
+
+# 样本量几乎相等
+total <- 892 + 973  # 1865
+weight_Crescent <- 892 / 1865  # 0.478
+weight_Little <- 973 / 1865    # 0.522
+
+# 权重非常接近 0.5:0.5
+# 所以加权平均 ≈ 简单平均
+
+
+
 ### 2. Setup and Script
 `R/scripts/test_birds.R`
 

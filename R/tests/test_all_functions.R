@@ -480,7 +480,8 @@ if (exists("adaptive_landscape")) {
 
     fitness_model <- mgcv::gam(
         fitness ~ s(size, speed),
-        data = df_prepared
+        data = df_prepared,
+        family = poisson
     )
 
     landscape <- adaptive_landscape(

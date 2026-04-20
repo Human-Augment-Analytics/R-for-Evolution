@@ -143,14 +143,22 @@ adaptive_landscape <- function(
         # Predict individual fitness
         if (inherits(fitness_model, "gam")) {
             ind_fitness <- predict(fitness_model, newdata = sim_df, type = "response")
+
+            # detect family
+            family_name <- fitness_model$family$family
+            if (family_name %in% c("poisson", "Negative Binomial", "quasipoisson")) {
+                ind_fitness <- pmax(ind_fitness, 0)
+            } else if (family_name == "binomial") {
+                ind_fitness <- pmin(pmax(ind_fitness, 0), 1)
+            }
         } else if (inherits(fitness_model, "Tps")) {
             ind_fitness <- predict(fitness_model, as.matrix(sim_df))
+            ind_fitness <- pmax(ind_fitness, 0)
         }
 
         # Mean population fitness
         mean_fitness[i] <- mean(ind_fitness, na.rm = TRUE)
     }
-
 
     # Add mean fitness to grid
     population_grid$.mean_fit <- mean_fitness

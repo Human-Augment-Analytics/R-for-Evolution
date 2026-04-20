@@ -11,6 +11,10 @@
 #
 # When group is specified, the function automatically runs separate
 #      analyses for each group and returns a list of results.
+#
+# k = NULL (default) triggers adaptive k selection:
+# k_2d <- min(30, max(10, floor(sqrt(n_unique1 * n_unique2))))
+# k can be overridden by the user for manual control.
 # ======================================================
 
 `%||%` <- function(a, b) if (!is.null(a)) a else b
@@ -23,7 +27,7 @@ correlated_fitness_surface <- function(
   method = "auto",
   scale_traits = FALSE,
   group = NULL,
-  k = 30
+  k = NULL
 ) {
   stopifnot(length(trait_cols) == 2L)
   need <- c(fitness_col, trait_cols)
@@ -38,6 +42,20 @@ correlated_fitness_surface <- function(
   }
 
   # ======================================================
+  # Adaptive k selection (before group splitting) based on full dataset unique values for both traits
+  # ======================================================
+  if (is.null(k)) {
+    n_unique1 <- length(unique(data[[trait_cols[1]]][complete.cases(data[[trait_cols[1]]])]))
+    n_unique2 <- length(unique(data[[trait_cols[2]]][complete.cases(data[[trait_cols[2]]])]))
+    k <- min(30, max(10, floor(sqrt(n_unique1 * n_unique2))))
+    message(
+      "Adaptive k selected: k = ", k,
+      " (n_unique: ", trait_cols[1], " = ", n_unique1,
+      ", ", trait_cols[2], " = ", n_unique2, ")"
+    )
+  }
+
+  # ======================================================
   # If group is specified, run separate analyses for each group
   # ======================================================
   if (!is.null(group)) {
@@ -47,19 +65,17 @@ correlated_fitness_surface <- function(
     for (g in groups) {
       data_g <- data[data[[group]] == g, ]
 
-      # Recursively call without group
       res <- correlated_fitness_surface(
-        data = data_g,
-        fitness_col = fitness_col,
-        trait_cols = trait_cols,
-        grid_n = grid_n,
-        method = method,
+        data         = data_g,
+        fitness_col  = fitness_col,
+        trait_cols   = trait_cols,
+        grid_n       = grid_n,
+        method       = method,
         scale_traits = scale_traits,
-        group = NULL, # No further grouping
-        k = k
+        group        = NULL,
+        k            = k
       )
 
-      # Add group identifier
       res$group_value <- g
       results_list[[as.character(g)]] <- res
     }
@@ -86,7 +102,7 @@ correlated_fitness_surface <- function(
   }
 
   message("IMPORTANT: Traits should already be standardized (mean = 0, SD = 1).")
-  message("           Do NOT apply scale() again within this function.")
+  message("Do NOT apply scale() again within this function.")
 
   # Check if traits appear standardized
   for (t in trait_cols) {
@@ -160,7 +176,7 @@ correlated_fitness_surface <- function(
 
     # Prepare data frame
     df_fit <- data.frame(
-      .y = as.numeric(y),
+      .y     = as.numeric(y),
       trait1 = as.numeric(x1s),
       trait2 = as.numeric(x2s)
     )
@@ -169,26 +185,33 @@ correlated_fitness_surface <- function(
 
     cat("GAM fitting with", nrow(df_fit), "observations\n")
 
-    # Build formulas (no group because we're in main analysis)
-    k_adj <- min(k, nrow(df_fit) - 1)
+    # ======================================================
+    # Safety check: cap k at subset-level constraints
+    # ======================================================
+    n_unique1_sub <- length(unique(df_fit[[trait_cols[1]]]))
+    n_unique2_sub <- length(unique(df_fit[[trait_cols[2]]]))
+    k_cap <- min(30, max(10, floor(sqrt(n_unique1_sub * n_unique2_sub))))
+    k_adj <- min(k, k_cap, nrow(df_fit) - 1)
 
+    if (k_adj < k) {
+      message("Adjusting k from ", k, " to ", k_adj, " for this subset")
+      k_use <- k_adj
+    } else {
+      k_use <- k
+    }
+
+    # Build formulas with fallbacks
     fml <- as.formula(paste(
-      ".y ~ s(", trait_cols[1], ", ", trait_cols[2],
-      ", bs = 'tp', k = ", k_adj, ")"
+      ".y ~ s(", trait_cols[1], ",", trait_cols[2],
+      ", bs = 'tp', k =", k_use, ")"
     ))
     fml_alt1 <- as.formula(paste(
-      ".y ~ s(", trait_cols[1],
-      ", k = min(floor(", k_adj, "/2), nrow(df_fit) - 1)) + s(",
-      trait_cols[2],
-      ", k = min(floor(", k_adj, "/2), nrow(df_fit) - 1))"
+      ".y ~ s(", trait_cols[1], ", k =", max(5, floor(k_use / 2)), ") +",
+      "s(", trait_cols[2], ", k =", max(5, floor(k_use / 2)), ")"
     ))
-    fml_alt2 <- as.formula(paste(".y ~ ", trait_cols[1], " + ", trait_cols[2]))
+    fml_alt2 <- as.formula(paste(".y ~", trait_cols[1], "+", trait_cols[2]))
 
-    try_formulas <- list(
-      main = fml,
-      alt1 = fml_alt1,
-      alt2 = fml_alt2
-    )
+    try_formulas <- list(main = fml, alt1 = fml_alt1, alt2 = fml_alt2)
 
     fit <- NULL
     formula_used <- NULL
@@ -199,7 +222,7 @@ correlated_fitness_surface <- function(
           {
             cat("  Trying formula:", form_name, "\n")
             fit <- mgcv::gam(try_formulas[[form_name]],
-              data = df_fit,
+              data   = df_fit,
               family = fam,
               method = "REML"
             )
@@ -239,23 +262,26 @@ correlated_fitness_surface <- function(
       grid$.fit[is.na(grid$.fit)] <- mean(grid$.fit, na.rm = TRUE)
     }
 
-    cat("Success Predictions range:", round(range(grid$.fit), 4), "\n")
+    cat("Predictions range:", round(range(grid$.fit), 4), "\n")
 
     return(list(
-      model = fit,
-      grid = grid,
-      method = "gam",
+      model        = fit,
+      grid         = grid,
+      method       = "gam",
       formula_used = formula_used,
-      data_type = ifelse(is_binary, "binary", "continuous"),
-      trait_cols = trait_cols,
-      fitness_col = fitness_col,
-      group_used = NULL,
+      k_used       = k_use,
+      data_type    = ifelse(is_binary, "binary", "continuous"),
+      trait_cols   = trait_cols,
+      fitness_col  = fitness_col,
+      group_used   = NULL,
       surface_type = "correlated_fitness",
-      note = "Correlated fitness surface (individual fitness)"
+      note         = "Correlated fitness surface (individual fitness)"
     ))
   }
 
+  # ======================================================
   # TPS method for continuous data
+  # ======================================================
   if (!requireNamespace("fields", quietly = TRUE)) {
     stop("For continuous fitness with tps method, install fields: install.packages('fields')")
   }
@@ -288,14 +314,14 @@ correlated_fitness_surface <- function(
   }
 
   return(list(
-    model = tps_model,
-    grid = grid,
-    method = "tps",
-    data_type = ifelse(is_binary, "binary", "continuous"),
-    trait_cols = trait_cols,
-    fitness_col = fitness_col,
-    group_used = NULL,
+    model        = tps_model,
+    grid         = grid,
+    method       = "tps",
+    data_type    = ifelse(is_binary, "binary", "continuous"),
+    trait_cols   = trait_cols,
+    fitness_col  = fitness_col,
+    group_used   = NULL,
     surface_type = "correlated_fitness",
-    note = "Correlated fitness surface (individual fitness)"
+    note         = "Correlated fitness surface (individual fitness)"
   ))
 }
