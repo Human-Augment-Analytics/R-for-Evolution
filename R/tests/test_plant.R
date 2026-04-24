@@ -13,8 +13,13 @@ cat("Working directory:", getwd(), "\n")
 # 1 Initialize environment
 # ------------------------------------------------------
 
-if (file.exists("R/scripts/0.0_initialize.R")) {
-    source("R/scripts/0.0_initialize.R")
+library(dplyr)
+
+# Set a base directory resilient to being run from root or tests/
+base_dir <- if (basename(getwd()) == "tests") ".." else "R"
+
+if (file.exists(file.path(base_dir, "scripts", "0.0_initialize.R"))) {
+    source(file.path(base_dir, "scripts", "0.0_initialize.R"))
 }
 
 # ======================================================
@@ -24,7 +29,7 @@ if (file.exists("R/scripts/0.0_initialize.R")) {
 cat("\nLoading script files...\n")
 
 script_files <- list.files(
-    "R/scripts",
+    file.path(base_dir, "scripts"),
     pattern = "\\.R$",
     full.names = TRUE
 )
@@ -43,7 +48,7 @@ for (f in script_files) {
 cat("\nLoading function files...\n")
 
 fn_files <- list.files(
-    "R/functions",
+    file.path(base_dir, "functions"),
     pattern = "\\.R$",
     full.names = TRUE
 )
@@ -60,7 +65,7 @@ for (f in fn_files) {
 cat("\nLoading plotting functions...\n")
 
 plot_files <- list.files(
-    "R/plotting",
+    file.path(base_dir, "plotting"),
     pattern = "\\.R$",
     full.names = TRUE
 )
@@ -389,7 +394,7 @@ for (trait in traits) {
             trait_col = trait,
             title = paste("Fitness Function:", trait)
         )
-        ggsave(file.path(figure_dir, paste0("univariate_", trait, ".png")), p, width = 7, height = 5, dpi = 300)
+        ggplot2::ggsave(file.path(figure_dir, paste0("univariate_", trait, ".png")), p, width = 7, height = 5, dpi = 300)
     } else {
         cat("\n")
     }
@@ -415,7 +420,7 @@ for (pair in trait_pairs) {
                 data = combined_data,
                 fitness_col = "relative_fitness",
                 trait_cols = pair,
-                grid_n = 30,
+                grid_n = 50,
                 method = "tps"
             )
 
@@ -424,9 +429,9 @@ for (pair in trait_pairs) {
             saveRDS(cfs, file.path(model_dir, paste0("cfs_", pair_name, ".rds")))
 
             if (exists("plot_correlated_fitness")) {
-                p <- plot_correlated_fitness(cfs, pair) +
-                    labs(title = paste("Fitness Surface:", pair_name))
-                ggsave(file.path(figure_dir, paste0("cfs_", pair_name, ".png")),
+                p <- plot_correlated_fitness(tps = cfs, trait_cols = pair) +
+                    ggplot2::labs(title = paste("Fitness Surface:", pair_name))
+                ggplot2::ggsave(file.path(figure_dir, paste0("cfs_", pair_name, ".png")),
                     p,
                     width = 8, height = 6, dpi = 300
                 )
@@ -435,11 +440,13 @@ for (pair in trait_pairs) {
 
             if (exists("plot_correlated_fitness_enhanced")) {
                 p_enhanced <- plot_correlated_fitness_enhanced(
-                    cfs, pair,
+                    tps           = cfs, 
+                    trait_cols    = pair,
                     original_data = combined_data,
-                    fitness_col = "relative_fitness"
+                    fitness_col   = "relative_fitness",
+                    bins          = 12
                 )
-                ggsave(file.path(figure_dir, paste0("cfs_", pair_name, "_enhanced.png")),
+                ggplot2::ggsave(file.path(figure_dir, paste0("cfs_", pair_name, "_enhanced.png")),
                     p_enhanced,
                     width = 8, height = 6, dpi = 300
                 )
@@ -564,7 +571,7 @@ if (exists("adaptive_landscape") && length(cfs_results) > 0) {
                         original_data = combined_data,
                         bins = 12
                     )
-                    ggsave(file.path(figure_dir, paste0("adaptive_landscape_", pair_name, "_2d.png")),
+                    ggplot2::ggsave(file.path(figure_dir, paste0("adaptive_landscape_", pair_name, "_2d.png")),
                         p2d,
                         width = 8, height = 6, dpi = 300
                     )
@@ -577,8 +584,11 @@ if (exists("adaptive_landscape") && length(cfs_results) > 0) {
                         width = 8, height = 6, units = "in", res = 300
                     )
                     plot_adaptive_landscape_3d(
-                        landscape, trait_pair,
-                        theta = -30, phi = 30, grid_n = 200
+                        landscape  = landscape, 
+                        trait_cols = trait_pair,
+                        theta      = -30, 
+                        phi        = 30, 
+                        grid_n     = 200
                     )
                     dev.off()
                     cat("  3D plot saved\n")
@@ -588,5 +598,61 @@ if (exists("adaptive_landscape") && length(cfs_results) > 0) {
                 cat("FAILED:", e$message, "\n")
             }
         )
+    }
+}
+
+# ------------------------------------------------------
+# 19 Compare Fitness Surfaces
+# ------------------------------------------------------
+
+if (exists("compare_fitness_surfaces_data") && exists("plot_fitness_surfaces_comparison") && length(cfs_results) > 0) {
+    cat("\n=== Compare Fitness Surfaces ===\n")
+    
+    for (pair_name in names(cfs_results)) {
+        cat("\n---", pair_name, "---\n")
+        
+        trait_pair <- strsplit(pair_name, "_")[[1]]
+        
+        cfs_model <- cfs_results[[pair_name]]
+        landscape_file <- file.path(model_dir, paste0("adaptive_landscape_", pair_name, ".rds"))
+        
+        if (file.exists(landscape_file)) {
+            landscape <- readRDS(landscape_file)
+            
+            tryCatch({
+                comparison_data <- compare_fitness_surfaces_data(
+                    correlated_surface    = cfs_model,
+                    adaptive_landscape    = landscape,
+                    trait_cols            = trait_pair,
+                    calculate_correlation = TRUE
+                )
+                
+                plots <- plot_fitness_surfaces_comparison(
+                    comparison_data = comparison_data,
+                    bins            = 10,
+                    title           = paste("Fitness Surfaces -", pair_name)
+                )
+                
+                if (!is.null(plots$side_by_side)) {
+                    ggplot2::ggsave(
+                        file.path(figure_dir, paste0("comparison_", pair_name, "_side_by_side.png")),
+                        plots$side_by_side,
+                        width = 12, height = 5, dpi = 300
+                    )
+                    cat("  Side-by-side plot saved\n")
+                }
+                
+                if (!is.null(plots$overlay)) {
+                    ggplot2::ggsave(
+                        file.path(figure_dir, paste0("comparison_", pair_name, "_overlay.png")),
+                        plots$overlay,
+                        width = 8, height = 6, dpi = 300
+                    )
+                    cat("  Overlay plot saved\n")
+                }
+            }, error = function(e) {
+                cat("FAILED comparison:", e$message, "\n")
+            })
+        }
     }
 }

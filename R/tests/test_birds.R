@@ -319,7 +319,7 @@ for (year in available_years) {
                     trait_col = beak_trait,
                     title = paste("Fitness Function - Year", year)
                 )
-                ggsave(file.path(figure_dir, paste0("univariate_", year, ".png")), p, width = 7, height = 5, dpi = 300)
+                ggplot2::ggsave(file.path(figure_dir, paste0("univariate_", year, ".png")), p, width = 7, height = 5, dpi = 300)
             }
         },
         error = function(e) {
@@ -343,8 +343,19 @@ for (year in available_years) {
                 saveRDS(cfs, file.path(model_dir, paste0("cfs_", year, ".rds")))
 
                 if (exists("plot_correlated_fitness")) {
-                    p <- plot_correlated_fitness(cfs, TRAITS[1:2]) + labs(title = paste("Fitness Surface - Year", year))
-                    ggsave(file.path(figure_dir, paste0("cfs_", year, ".png")), p, width = 8, height = 6, dpi = 300)
+                    p <- plot_correlated_fitness(tps = cfs, trait_cols = TRAITS[1:2]) + ggplot2::labs(title = paste("Fitness Surface - Year", year))
+                    ggplot2::ggsave(file.path(figure_dir, paste0("cfs_", year, ".png")), p, width = 8, height = 6, dpi = 300)
+                }
+
+                if (exists("plot_correlated_fitness_enhanced")) {
+                    p_enhanced <- plot_correlated_fitness_enhanced(
+                        tps           = cfs,
+                        trait_cols    = TRAITS[1:2],
+                        original_data = year_data,
+                        fitness_col   = "Survived",
+                        bins          = 12
+                    )
+                    ggplot2::ggsave(file.path(figure_dir, paste0("cfs_", year, "_enhanced.png")), p_enhanced, width = 8, height = 6, dpi = 300)
                 }
             },
             error = function(e) {
@@ -385,7 +396,7 @@ for (year in available_years) {
                         original_data = year_data,
                         bins = 12
                     )
-                    ggsave(file.path(figure_dir, paste0("adaptive_landscape_", year, ".png")), p2d, width = 8, height = 6, dpi = 300)
+                    ggplot2::ggsave(file.path(figure_dir, paste0("adaptive_landscape_", year, ".png")), p2d, width = 8, height = 6, dpi = 300)
                 }
 
                 # ============================================
