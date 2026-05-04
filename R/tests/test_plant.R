@@ -7,14 +7,19 @@ cat("\n========================================\n")
 cat("ASTER PLANT DATASET FUNCTION TEST\n")
 cat("========================================\n")
 
-cat("Working directory:", getwd(), "\n")
+if (!requireNamespace("here", quietly = TRUE)) {
+  install.packages("here")
+}
+library("here", character.only = TRUE)
+
+cat("Project Root:", here(), "\n")
 
 # ------------------------------------------------------
 # 1 Initialize environment
 # ------------------------------------------------------
 
-if (file.exists("R/scripts/0.0_initialize.R")) {
-    source("R/scripts/0.0_initialize.R")
+if (file.exists(here("R","scripts","0.0_initialize.R"))) {
+    source(here("R","scripts","0.0_initialize.R"))
 }
 
 # ======================================================
@@ -24,7 +29,7 @@ if (file.exists("R/scripts/0.0_initialize.R")) {
 cat("\nLoading script files...\n")
 
 script_files <- list.files(
-    "R/scripts",
+    here("R","scripts"),
     pattern = "\\.R$",
     full.names = TRUE
 )
@@ -43,7 +48,7 @@ for (f in script_files) {
 cat("\nLoading function files...\n")
 
 fn_files <- list.files(
-    "R/functions",
+    here("R","functions"),
     pattern = "\\.R$",
     full.names = TRUE
 )
@@ -60,7 +65,7 @@ for (f in fn_files) {
 cat("\nLoading plotting functions...\n")
 
 plot_files <- list.files(
-    "R/plotting",
+    here("R","plotting"),
     pattern = "\\.R$",
     full.names = TRUE
 )

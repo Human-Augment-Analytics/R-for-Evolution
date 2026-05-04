@@ -1,23 +1,40 @@
 # ======================================================
 # adaptive_landscape.R
-# Calculate Adaptive Landscape (Sewall Wright's concept)
 #
-# IMPORTANT CONCEPT:
-# Adaptive Landscape = Mean fitness ~ Population mean phenotype
-# Formula: W̄ ~ z̄₁ + z̄₂
+# Purpose:
+#   1. Calculate Adaptive Landscape (Sewall Wright's concept)
 #
-# This is DIFFERENT from correlated fitness surface:
-# - Correlated fitness: w ~ z (individual fitness)
-# - Adaptive landscape: W̄ ~ z̄ (population mean fitness)
+# Model:
+#   W̄ ~ z̄₁ + z̄₂
 #
-# KEY PRINCIPLE:
-# - Traits MUST already be standardized (mean = 0, SD = 1)
-# - Use prepare_selection_data() with standardize = TRUE before calling
-# - DO NOT standardize again within this function
+# IMPORTANT NOTE:
+#   - Adaptive Landscape = Mean fitness ~ Population mean phenotype
+#   - This is DIFFERENT from correlated fitness surface:
+#     - Correlated fitness: w ~ z (individual fitness)
+#     - Adaptive landscape: W̄ ~ z̄ (population mean fitness)
+#   - KEY PRINCIPLE:
+#     - Traits MUST already be standardized (mean = 0, SD = 1)
+#     - Use prepare_selection_data() with standardize = TRUE before calling
+#     - DO NOT standardize again within this function
+#   - Requires:
+#     - A fitted fitness model (from GAM or TPS) that predicts individual fitness
+#     - Individual-level data to estimate within-population variance
 #
-# Requires:
-# - A fitted fitness model (from GAM or TPS) that predicts individual fitness
-# - Individual-level data to estimate within-population variance
+# Parameters:
+#   data                : data frame with fitness and trait measurements
+#   fitness_model       : A fitted model object (e.g., GAM or Tps) predicting individual fitness.
+#   trait_cols          : vector of trait column names
+#   group_col           : Optional character string specifying a grouping variable.
+#   population_variance : Optional covariance matrix for the traits. Estimated from data if \code{NULL}.
+#   simulation_n        : Integer specifying the number of individuals to simulate per grid point. Default is 1000.
+#   grid_n              : Integer specifying the resolution of the population mean grid. Default is 50.
+#   custom_range        : Optional list specifying custom ranges for the traits.
+#
+# Returns:
+#   List with grid, trait_cols, population_variance, simulation_n, optimum, 
+#             actual_population_means, fitness_model_class, data_summary, 
+#             surface_type, and note
+#   Method for adaptive landscape
 # ======================================================
 
 #' Calculate Adaptive Landscape
@@ -33,18 +50,17 @@
 #' @param simulation_n Integer specifying the number of individuals to simulate per grid point. Default is 1000.
 #' @param grid_n Integer specifying the resolution of the population mean grid. Default is 50.
 #' @param custom_range Optional list specifying custom ranges for the traits.
+#' 
 #' @return An object of class \code{"adaptive_landscape"}.
 #' @export
-adaptive_landscape <- function(
-  data,
-  fitness_model,
-  trait_cols,
-  group_col = NULL,
-  population_variance = NULL,
-  simulation_n = 1000,
-  grid_n = 50,
-  custom_range = NULL
-) {
+adaptive_landscape <- function(data, 
+                               fitness_model, 
+                               trait_cols, 
+                               group_col = NULL, 
+                               population_variance = NULL, 
+                               simulation_n = 1000, 
+                               grid_n = 50, 
+                               custom_range = NULL) {
     # Input validation
     stopifnot(length(trait_cols) == 2L)
     stopifnot(inherits(fitness_model, "gam") || inherits(fitness_model, "Tps"))

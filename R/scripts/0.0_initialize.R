@@ -1,6 +1,8 @@
 # ======================================================
-# 0.0_initialize.R
-# Project initialization script
+# initialize.R
+#
+# Purpose:
+#   1. Installs and loads all required packages
 # ======================================================
 
 cat("\n========================================\n")

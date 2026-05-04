@@ -1,7 +1,16 @@
 # ============================================================================
 # analyze_nonlinear_selection
 #
-# Purpose: Estimate quadratic (γ) and correlational (γ_ij) selection gradients
+# Purpose: 
+#   1. Estimate quadratic (γ) and correlational (γ_ij) selection gradients
+#
+# Model:
+#   w = α + β₁z₁ + β₂z₂ + ½γ₁₁z₁² + ½γ₂₂z₂² + γ₁₂z₁z₂ + ε
+#
+#   Where:
+#     β = linear selection gradients
+#     γ_ii = quadratic selection gradients (stabilizing/disruptive)
+#     γ_ij = correlational selection gradients (interactions)
 #
 # IMPORTANT NOTE:
 #   - ALWAYS use OLS to estimate selection gradients (β, γ, γ_ij)
@@ -11,20 +20,18 @@
 #   - For continuous fitness: OLS provides both gradient estimates AND valid
 #     p-values (via t-tests and F-tests).
 #
-# Model:
-#   w = α + β₁z₁ + β₂z₂ + ½γ₁₁z₁² + ½γ₂₂z₂² + γ₁₂z₁z₂ + ε
-#
-# Where:
-#   - β = linear selection gradients
-#   - γ_ii = quadratic selection gradients (stabilizing/disruptive)
-#   - γ_ij = correlational selection gradients (interactions)
-#
 # Workflow:
 #   1. Build formula with linear, quadratic, and interaction terms
 #   2. Fit OLS to get all gradient estimates (β, γ, γ_ij)
 #   3. For binary fitness: fit logistic GLM for valid p-values
 #   4. Type III ANOVA for significance tests
 #   5. VIF check for multicollinearity
+#
+# Parameters:
+#   data           : data frame containing fitness and trait measurements
+#   fitness_col    : name of the fitness column (character)
+#   trait_cols     : vector of trait column names
+#   fitness_type   : "binary" or "continuous"
 #
 # Returns:
 #   For continuous: list with model_ols, summary_ols, anova, vif, fitness_type
@@ -43,7 +50,10 @@
 #'
 #' @return A list containing the fitted nonlinear models, summaries, ANOVA tables, and VIFs.
 #' @export
-analyze_nonlinear_selection <- function(data, fitness_col, trait_cols, fitness_type) {
+analyze_nonlinear_selection <- function(data, 
+                                        fitness_col, 
+                                        trait_cols, 
+                                        fitness_type) {
   if (length(trait_cols) < 2) {
     stop("Nonlinear selection requires at least 2 traits")
   }

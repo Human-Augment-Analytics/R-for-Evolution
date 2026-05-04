@@ -1,7 +1,8 @@
 # ============================================================================
 # analyze_linear_selection
 #
-# Purpose: Estimate linear selection gradients (β) using Lande & Arnold (1983)
+# Purpose: 
+#   1. Estimate linear selection gradients (β) using Lande & Arnold (1983)
 #
 # IMPORTANT NOTE:
 #   - ALWAYS use OLS (ordinary least squares) to estimate selection gradients
@@ -27,6 +28,12 @@
 #     4. Type III ANOVA on GLM for overall term significance
 #     5. Check VIF using OLS (GLM VIF not directly comparable)
 #
+# Parameters:
+#   data           : data frame containing fitness and trait measurements
+#   fitness_col    : name of the fitness column (character)
+#   trait_cols     : vector of trait column names
+#   fitness_type   : "binary" or "continuous"
+#
 # Returns:
 #   For continuous: list with model (lm), summary, anova, vif, fitness_type
 #   For binary: list with model (list of ols and glm), summary (list of ols and glm),
@@ -44,7 +51,10 @@
 #'
 #' @return A list containing the fitted models, summaries, ANOVA tables, and VIFs.
 #' @export
-analyze_linear_selection <- function(data, fitness_col, trait_cols, fitness_type) {
+analyze_linear_selection <- function(data,
+                                     fitness_col, 
+                                     trait_cols, 
+                                     fitness_type) {
   # Check sample size
   if (nrow(data) < 10) {
     warning("Small sample size (n < 10) — results may be unreliable")
